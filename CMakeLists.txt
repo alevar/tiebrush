@@ -49,7 +49,7 @@ add_executable(tiebrush src/tiebrush.cpp
                         ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp)
 
 add_dependencies(tiebrush htslib)
-target_link_libraries(tiebrush -Wl,-Bstatic -lhts -Wl,-Bdynamic -lz -llzma -lbz2 -pthread -Wl,--as-needed) # -lcrypto
+target_link_libraries(tiebrush libhts.a -lz -llzma -lbz2 -pthread)
 
 add_executable(tiecov src/tiecov.cpp
                       src/commons.h
@@ -65,6 +65,6 @@ add_executable(tiecov src/tiecov.cpp
                       ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp)
 
 add_dependencies(tiecov htslib)
-target_link_libraries(tiecov ${LBW_LIB} -Wl,-Bstatic -lhts -Wl,-Bdynamic -lz -llzma -lbz2 -pthread -Wl,--as-needed) # -lBigWig -lcrypto
+target_link_libraries(tiecov ${LBW_LIB} libhts.a -lz -llzma -lbz2 -pthread) # -lBigWig -lcrypto
 
 install(TARGETS tiebrush tiecov DESTINATION bin)

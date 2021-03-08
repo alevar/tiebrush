@@ -26,10 +26,10 @@ const char* USAGE = " TieBrush v" VERSION "\n"
                               " usage: tiebrush  [-h] -o OUTPUT [-L] [-P] [-E] [-S] [-M] [-N max_NH_value] "
                               "[-Q min_mapping_quality] [-F FLAGS] ...\n"
                               "\n"
-                              " Positional Arguments: \n"
+                              " Input arguments: ...\n"
                               "  input\t\t\tInput can be provided as a space-delimited\n"
-                              "       \t\t\tlist of filenames at the end of the command\n"
-                              "       \t\t\tline or as a text file containing a list of\n"
+                              "       \t\t\tlist of filenames line or as a text file containing\n"
+                              "       \t\t\t a list of\n"
                               "       \t\t\tfilenames one per each line\n"
                               "\n"
                               " Non-Optional Arguments:\n"
@@ -63,7 +63,7 @@ const char* USAGE = " TieBrush v" VERSION "\n"
                               "  -N\t\t\tMaximum NH score of the reads to retain\n"
                               "  -Q\t\t\tMinimum mapping quality of the reads to retain\n"
                               "  -F\t\t\tBits in SAM flag to use in read comparison. Only reads that\n"
-                              "    \t\t\thave specified flags will be merged together (default: 0)";
+                              "    \t\t\thave specified flags will be merged together (default: 0)\n";
 
 // 1. add mode to select representative alignment
 // 2. add mode to select consensus sequence
@@ -114,10 +114,7 @@ struct GSegList { //per sample per strand
   GSegNode* startNode;
   uint last_pos;
   int last_dist;
-  GSegList():startNode(NULL),last_pos(0),last_dist(-1) {
-	  //a new list always has (0,0) interval -- no longer needed
-	  //startNode=new GSegNode();
-  }
+  GSegList():startNode(NULL),last_pos(0),last_dist(-1) { }
 
   ~GSegList() {
 	  clear();

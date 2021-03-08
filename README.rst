@@ -77,27 +77,31 @@ The goal is to generate this composite BAM file which multiplexes read alignment
 samples, painting a comprehensive "background" picture of read alignments with their counts across
 many samples.
 
-  tiebrush  [-h] -o OUTPUT [-L] [-P] [-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
+  tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
 
-  Input Arguments
+  Input arguments
 
-  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames one per each line
+  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per each line
 
-  Non-Optional Arguments:
+  Required arguments:
 
   -o        File for BAM output
 
-  Optional Arguments:
+  Optional arguments:
 
-  -h, --help		Show this help message and exit
+  -h, --help        Show this help message and exit
+  --version         Show the program version end exit
   -L, --full        If enabled, only reads with the same CIGAR and MD strings will be grouped and collapsed. By default, TieBrush will consider the CIGAR string only when grouping reads
-  -P, --clip         If enabled, reads will be grouped by clipped CIGAR string. In this mode 5S10M5S and 3S10M3S CIGAR strings will be grouped if the coordinates of the matching substring (10M) are the same between reads
-  -E, --exon         If enabled, reads will be grouped if their exon boundaries are the same. This option discards any structural variants contained in mapped substrings of the read and only considers start and end coordinates of each non-splicing segment of the CIGAR string
-  -S, --keep-supp    If enabled, supplementary alignments will be included in the collapsed groups of reads. By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each supplementary mapping will count as a separate read
-  -M, --keep-unmap   If enabled, unmapped reads will be retained (uncollapsed) in the output. By default, TieBrush removes any unmapped reads
+  -P, --clip        If enabled, reads will be grouped by clipped CIGAR string. In this mode 5S10M5S and 3S10M3S CIGAR strings will be grouped if the coordinates of the matching substring (10M) are the same between reads
+  -E, --exon        If enabled, reads will be grouped if their exon boundaries are the same. This option discards any structural variants contained in mapped substrings of the read and only considers start and end coordinates of each non-splicing segment of the CIGAR string
+  -S, --keep-supp   If enabled, supplementary alignments will be included in the collapsed groups of reads. By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each supplementary mapping will count as a separate read
+  -M, --keep-unmap  If enabled, unmapped reads will be retained (uncollapsed) in the output. By default, TieBrush removes any unmapped reads
   -N                Maximum NH score (if available) to include.
   -Q                Minimum mapping quality to include.
   -F                Bits in SAM flag to use in read comparison. Only reads that have specified flags will be merged together (default: 0)
+
+Note that options -L, -P and -E are mutually exclusive. 
+
 
 SAM tags implemented
 --------------------
@@ -131,9 +135,9 @@ divide them into batches processing and combining batches to produce a single re
 All standard TieBrush arguments can be passed over to TieWrap. Additionally size of individual batches
 as well as the concurrency parameters can be set explicitely.
 
-  tiewrap.py [-h] -o OUTPUT [-L] [-P] [-E] [-S] [-M] [-N MAX_NH] [-Q MIN_MAP_QUAL] [-F FLAGS] [-t THREADS] [-b BATCH_SIZE] ...
+  tiewrap.py [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N MAX_NH] [-Q MIN_MAP_QUAL] [-F FLAGS] [-t THREADS] [-b BATCH_SIZE] ...
 
-  Non-Optional Arguments:
+  Required arguments:
 
   -o, --output          File for BAM output.
 

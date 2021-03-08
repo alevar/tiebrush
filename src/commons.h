@@ -91,7 +91,7 @@ std::string get_full_path(std::string fname){
         free(actualpath);
     }
     else{
-        std::cerr<<"could not resolve path: "<<fname<<std::endl;
+        std::cerr<<"Error: could not resolve path: "<<fname<<std::endl;
         exit(-1);
     }
 }

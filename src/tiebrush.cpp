@@ -22,24 +22,26 @@ const char* USAGE = " TieBrush v" VERSION "\n"
                               "count (how many times the same alignment is seen across all input data) and "
                               "\"sample count\" (how many samples show that same alignment).\n"
                               "==================\n"
-                              "\n"
-                              " usage: tiebrush  [-h] -o OUTPUT [-L] [-P] [-E] [-S] [-M] [-N max_NH_value] "
+                              "\nUsage:\n"
+                              " tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] "
                               "[-Q min_mapping_quality] [-F FLAGS] ...\n"
                               "\n"
                               " Input arguments: ...\n"
                               "  input\t\t\tInput can be provided as a space-delimited list\n"
-                              "       \t\t\tof filenames line or as a text file containing\n"
+                              "       \t\t\tof filenames or as a text file containing\n"
                               "       \t\t\ta list of filenames, one per each line\n"
                               "\n"
-                              " Non-Optional Arguments:\n"
+                              " Required arguments:\n"
                               "  -o\t\t\tFile for BAM output\n"
                               "\n"
-                              " Optional Arguments:\n"
+                              " Optional arguments:\n"
                               "  -h,--help\t\tShow this help message and exit\n"
+                              "  --version\t\tShow the program version and exit\n"
                               "  -L,--full\t\tIf enabled, only reads with the same CIGAR\n"
                               "           \t\tand MD strings will be grouped and collapsed.\n"
                               "           \t\tBy default, TieBrush will consider the CIGAR\n"
                               "           \t\tstring only when grouping reads\n"
+                              "           \t\tOnly one of -L, -P or -E options can be enabled\n"
                               "  -P,--clip\t\tIf enabled, reads will be grouped by clipped\n"
                               "           \t\tCIGAR string. In this mode 5S10M5S and 3S10M3S\n"
                               "           \t\tCIGAR strings will be grouped if the coordinates\n"
@@ -72,7 +74,7 @@ const char* USAGE = " TieBrush v" VERSION "\n"
 // 6. fix PG/RG sample confusion
 
 enum TMrgStrategy {
-    tMrgStratCIGAR=0,  // same CIGAR (MD may differ)
+	tMrgStratCIGAR=0,  // same CIGAR (MD may differ)
 	tMrgStratFull, // same CIGAR and MD
 	tMrgStratClip,   // same CIGAR after clipping
 	tMrgStratExon    // same exons
@@ -95,7 +97,6 @@ GSamWriter* outfile=NULL;
 uint64_t inCounter=0;
 uint64_t outCounter=0;
 
-bool debugMode=false;
 bool verbose=false;
 
 struct GSegNode {
@@ -533,10 +534,7 @@ int main(int argc, char *argv[])  {
 	inRecords.setup(VERSION, argc, argv);
 	processOptions(argc, argv);
 	int numSamples=inRecords.start();
-	if (outfname.is_empty()) outfname="-";
-	GSamFileType oftype=(outfname=="-") ?
-			GSamFile_SAM : GSamFile_BAM;
-	outfile=new GSamWriter(outfname, inRecords.header(), oftype);
+	outfile=new GSamWriter(outfname, inRecords.header(), GSamFile_BAM);
 	rspacing.init(numSamples);
 	TInputRecord* irec=NULL;
 	GSamRecord* brec=NULL;
@@ -582,14 +580,27 @@ int main(int argc, char *argv[])  {
 void processOptions(int argc, char* argv[]) {
     GArgs args(argc, argv, "help;debug;verbose;version;full;clip;exon;keep-supp;keep-unmap;SMLPEDVho:N:Q:F:");
     args.printError(USAGE, true);
-    if (args.getOpt('h') || args.getOpt("help") || args.startNonOpt()==0) {
-        GMessage(USAGE);
-        exit(1);
-    }
 
     if (args.getOpt('h') || args.getOpt("help")) {
         fprintf(stdout,"%s",USAGE);
         exit(0);
+    }
+
+    if (args.getOpt("version")) {
+        fprintf(stdout,"%s\n", VERSION);
+        exit(0);
+    }
+
+    if (args.startNonOpt()==0) {
+        GMessage(USAGE);
+        GMessage("\nError: no input provided!\n");
+        exit(1);
+    }
+    outfname=args.getOpt('o');
+    if (outfname.is_empty()) {
+        GMessage(USAGE);
+        GMessage("\nError: output filename must be provided (-o)!\n");
+        exit(1);
     }
 
     GStr max_nh_str=args.getOpt('N');
@@ -618,19 +629,11 @@ void processOptions(int argc, char* argv[]) {
         else mrgStrategy=tMrgStratExon;
     }
 
-    debugMode=(args.getOpt("debug")!=NULL || args.getOpt('D')!=NULL);
     verbose=(args.getOpt("verbose")!=NULL || args.getOpt('V')!=NULL);
-    if (args.getOpt("version")) {
-        fprintf(stdout,"%s\n", VERSION);
-        exit(0);
-    }
-    verbose=(args.getOpt('v')!=NULL);
     if (verbose) {
         fprintf(stderr, "Running TieBrush " VERSION ". Command line:\n");
         args.printCmdLine(stderr);
     }
-    outfname=args.getOpt('o');
-
     const char* ifn=NULL;
     while ( (ifn=args.nextNonOpt())!=NULL) {
         //input alignment files

@@ -134,7 +134,7 @@ bool TInputFiles::addSam(GSamReader* r, int fidx) {
             }
             int res_rg = sam_hdr_add_line(mHdr, "CO", ("SAMPLE:"+std::get<0>(ls.second)).c_str(),NULL);
                 if(res_rg==-1){
-                    std::cerr<<"unable to complete adding CO tags for file names"<<std::endl;
+                    std::cerr<<"Error: unable to complete adding CO tags for file names"<<std::endl;
                     exit(-1);
                 }
         }
@@ -163,7 +163,7 @@ void TInputFiles::load_hdr_samples(sam_hdr_t* hdr,std::string filename,bool tbMe
                     found_line=true;
                     this->s2l_it = this->sample2lineno.insert(std::make_pair(line,std::make_tuple(this->max_sample_id,sample_line_pos,filename,donor)));
                     if(!this->s2l_it.second){ // not inserted
-                        std::cerr<<"duplicate entries detected"<<std::endl;
+                        std::cerr<<"Error: duplicate entries detected"<<std::endl;
                         exit(-1);
                     }
                     this->lineno2sample.insert(std::make_pair(this->max_sample_id,std::make_tuple(line,sample_line_pos,filename,donor)));
@@ -175,14 +175,14 @@ void TInputFiles::load_hdr_samples(sam_hdr_t* hdr,std::string filename,bool tbMe
             ks_free(&str);
         }
         if(!found_line){
-            std::cerr<<"Collapsed file does not have any CO: lines in the header"<<std::endl;
+            std::cerr<<"Error: collapsed file does not have any CO: lines in the header"<<std::endl;
             exit(-1);
         }
     }
     else{ // no sample was found - need to add current name to the header
         this->s2l_it = this->sample2lineno.insert(std::make_pair(get_full_path(filename),std::make_tuple(this->max_sample_id,sample_line_pos,"",donor)));
         if(!this->s2l_it.second){ // not inserted
-            std::cerr<<"duplicate entries detected"<<std::endl;
+            std::cerr<<"Error: duplicate entries detected"<<std::endl;
             exit(-1);
         }
         this->lineno2sample.insert(std::make_pair(this->max_sample_id,std::make_tuple(get_full_path(filename),sample_line_pos,"",donor)));
@@ -203,7 +203,7 @@ std::string TInputFiles::get_full_path(std::string fname){
         return ret;
     }
     else{
-        std::cerr<<"could not resolve path: "<<fname<<std::endl;
+        std::cerr<<"Error: could not resolve path: "<<fname<<std::endl;
         exit(-1);
     }
 }
@@ -249,7 +249,7 @@ bool TInputFiles::add_tb_tag_if_not_exists(sam_hdr_t *hdr){ // returns true if t
             bool ret = check_id(line,"ID:TB_TAG");
             if(ret){
                 if(found_tb_tag_line){
-                    std::cerr<<"multiple tb tag lines found"<<std::endl;
+                    std::cerr<<"Error: multiple tb tag lines found"<<std::endl;
                     exit(-1);
                 }
                 else{
@@ -265,7 +265,7 @@ bool TInputFiles::add_tb_tag_if_not_exists(sam_hdr_t *hdr){ // returns true if t
                                       "VL","1",
                                       "XN","1",NULL);
         if(res_rg==-1){
-            std::cerr<<"unable to complete adding pg tags for file names"<<std::endl;
+            std::cerr<<"Error: unable to complete adding pg tags for file names"<<std::endl;
             exit(-1);
         }
         return false;
@@ -291,7 +291,7 @@ void TInputFiles::delete_all_hdr_with_tag(sam_hdr_t *hdr,std::string tag1, std::
             if(ret){ // found line - remove
                 int ret_rm = sam_hdr_remove_line_pos(hdr,"PG",line_pos);
                 if(ret_rm!=0){
-                    std::cerr<<"could not find requested header line"<<std::endl;
+                    std::cerr<<"Error: could not find requested header line"<<std::endl;
                     exit(-1);
                 }
             }

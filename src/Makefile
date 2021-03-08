@@ -36,7 +36,7 @@ tiebrush: $(TBOBJS) tiebrush.o
 	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${HTSLIB} ${LIBS}
 
 tiecov: $(OBJS) tiecov.o
-	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${HTSLIB} ${BWIGLIB} ${LIBS}
+	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${HTSLIB} ${BWIGLIB} ${LIBS} -lcurl
 
 
 

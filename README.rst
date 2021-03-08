@@ -53,7 +53,7 @@ Operating System
   GNU/Linux, Mac
 
 Compiler
-  GCC ≥ 4.9, LLVM/Clang ≥ 3.8
+  GCC ≥ 4.8, LLVM/Clang ≥ 3.8
 
 Build system
   CMake ≥ 2.8
@@ -79,9 +79,9 @@ many samples.
 
   tiebrush  [-h] -o OUTPUT [-L] [-P] [-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
 
-  Positional Arguments
+  Input Arguments
 
-  ...        Input can be provided as a space-delimited list of filenames at the end of the command line or as a text file containing a list of filenames one per each line
+  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames one per each line
 
   Non-Optional Arguments:
 
@@ -137,7 +137,7 @@ as well as the concurrency parameters can be set explicitely.
 
   -o, --output          File for BAM output.
 
-  Positional arguments:
+  Input arguments:
 
   ...       Input can be provided as a space-delimited list of filenames or as a textfile containing a list of filenames one per each line.
 

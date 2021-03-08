@@ -16,12 +16,10 @@ LIBS    :=  -lz -llzma -lbz2 -pthread
 
 DMACH := $(shell ${CXX} -dumpmachine)
 
-ifneq (,$(findstring static, $(MAKECMDGOALS)))
-  #MacOS cannot link these statically 
-  ifeq (, $(findstring darwin, $(DMACH)))
-    LDFLAGS += -static-libgcc -static-libstdc++
-  endif      
-endif
+#ifneq (, $(findstring linux, $(DMACH)))
+#  # these static libraries must be installed for this to work:
+#  LDFLAGS += -static-libgcc -static-libstdc++
+#endif
 
 OBJS := ${GDIR}/GBase.o ${GDIR}/GArgs.o ${GDIR}/GStr.o \
    ./GSam.o 
@@ -35,10 +33,10 @@ TBOBJS := ${OBJS} ./tmerge.o
 all static : tiebrush tiecov
 
 tiebrush: $(TBOBJS) tiebrush.o
-	${LINKER} ${LDFLAGS} -o $@ ${HTSLIB} ${filter-out %.a %.so, $^} ${LIBS}
+	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${HTSLIB} ${LIBS}
 
 tiecov: $(OBJS) tiecov.o
-	${LINKER} ${LDFLAGS} -o $@ ${HTSLIB} ${BWIGLIB} ${filter-out %.a %.so, $^} ${LIBS}
+	${LINKER} ${LDFLAGS} -o $@ ${filter-out %.a %.so, $^} ${HTSLIB} ${BWIGLIB} ${LIBS}
 
 
 

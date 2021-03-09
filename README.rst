@@ -77,11 +77,11 @@ The goal is to generate this composite BAM file which multiplexes read alignment
 samples, painting a comprehensive "background" picture of read alignments with their counts across
 many samples.
 
-  tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
+  tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] `...`
 
   Input arguments:
 
-  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per line
+  `...`        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per line
 
   Required arguments:
 
@@ -105,9 +105,9 @@ Note that options -L, -P and -E are mutually exclusive.
 
 SAM tags implemented
 --------------------
- 1. __YC__:i:N stores the number of alignments that were merged into this alignment record (multiplicity count)
- 2. __YX__:i:N stores the number of samples that have this alignment (sample count)
- 3. __YD__:i:N keeps track of the maximum number of contiguous bases preceding the start of the read alignment in the samples(s) that it belongs to. In other words, if the current alignment is part of an exon-overlapping bundle (strand specific!), this value holds the maximum distance from the beginning of the bundle to the start of this alignment, across all samples having this alignment. If the alignment is not in a bundle (i.e. it is preceded by a uncovered region as it is not overlapped by any another alignment with a lower start position), in all the individual samples where that alignment is present, then the YD value is 0 and the tag is omitted from the output file produced by TieBrush. That means that all the alignments lacking a YD tag in the TieBrush output start at the very beginning of an exon-overlapping bundle (i.e. are not overlapped by a preceding alignment with a lower start coordinate).
+1. __YC__:i:N stores the number of alignments that were merged into this alignment record (multiplicity count)
+2. __YX__:i:N stores the number of samples that have this alignment (sample count)
+3. __YD__:i:N keeps track of the maximum number of contiguous bases preceding the start of the read alignment in the samples(s) that it belongs to. In other words, if the current alignment is part of an exon-overlapping bundle (strand specific!), this value holds the maximum distance from the beginning of the bundle to the start of this alignment, across all samples having this alignment. If the alignment is not in a bundle (i.e. it is preceded by a uncovered region as it is not overlapped by any another alignment with a lower start position), in all the individual samples where that alignment is present, then the YD value is 0 and the tag is omitted from the output file produced by TieBrush. That means that all the alignments lacking a YD tag in the TieBrush output start at the very beginning of an exon-overlapping bundle (i.e. are not overlapped by a preceding alignment with a lower start coordinate).
 
 If either YC or YX tags are missing (i.e. GBamRecord::__tag_int__() call returns 0) then the alignment is unique (when YC is 0) or only one sample has it (if YX is 0). The actual count in these cases is obviously 1.
 
@@ -116,9 +116,9 @@ TieCov
 
 The TieCov utility can take the output file produced by TieBrush and can generate the following auxiliary files:
 
- 1. a BedGraph file with the coverage data (see http://genome.ucsc.edu/goldenPath/help/bedgraph.html); this file can be converted to BigWig (using bedGraphToBigWig) or to TDF format (using igvtools) in order to be loaded in IGV as an additional coverage track
- 2. a junction BED file which can be loaded directly in IGV as an additional junction track (http://software.broadinstitute.org/software/igv/splice_junctions)
- 3. a heatmap BED that uses color intensity to represent the number of samples that contain each position.
+1. a BedGraph file with the coverage data (see http://genome.ucsc.edu/goldenPath/help/bedgraph.html); this file can be converted to BigWig (using bedGraphToBigWig) or to TDF format (using igvtools) in order to be loaded in IGV as an additional coverage track
+2. a junction BED file which can be loaded directly in IGV as an additional junction track (http://software.broadinstitute.org/software/igv/splice_junctions)
+3. a heatmap BED that uses color intensity to represent the number of samples that contain each position.
 
   tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] input
   

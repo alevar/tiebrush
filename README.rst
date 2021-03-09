@@ -77,11 +77,11 @@ The goal is to generate this composite BAM file which multiplexes read alignment
 samples, painting a comprehensive "background" picture of read alignments with their counts across
 many samples.
 
-  tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] `...`
+  tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
 
   Input arguments:
 
-  `...`        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per line
+  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per line
 
   Required arguments:
 
@@ -144,13 +144,13 @@ as well as the concurrency parameters can be set explicitely.
 
   tiewrap.py [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N MAX_NH] [-Q MIN_MAP_QUAL] [-F FLAGS] [-t THREADS] [-b BATCH_SIZE] ...
 
-  Required arguments:
-
-  -o, --output          File for BAM output.
-
   Input arguments:
 
   ...       Input can be provided as a space-delimited list of filenames or as a textfile containing a list of filenames one per each line.
+
+  Required arguments:
+
+  -o, --output          File for BAM output.
 
   Optional arguments:
 

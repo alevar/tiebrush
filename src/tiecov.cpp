@@ -17,8 +17,7 @@
 
 #define VERSION "0.0.6"
 
-const char* USAGE=" TieCov v" VERSION "\n"
-"\n"
+const char* USAGE="TieCov v" VERSION "\n"
 "==================\n"
 "The TieCov utility can take the output file produced by TieBrush and generate the following auxiliary files:\n"
 " 1. BedGraph file with the coverage data\n"
@@ -34,6 +33,7 @@ const char* USAGE=" TieCov v" VERSION "\n"
 "\n"
 " Optional arguments (at least one of -s/-c/-j must be specified):\n"
 "  -h,--help\tShow this help message and exit\n"
+"  --version\tShow program version and exit\n"
 "  -s\t\tBedGraph file with an estimate of the number of samples\n"
 "    \t\twhich contain alignments for each interval.\n"
 "  -c\t\tBedGraph (or BedWig with '-W') file with coverage\n"
@@ -55,7 +55,6 @@ bigWigFile_t *soutf_bw = NULL;
 
 std::vector<std::string> sample_info; // holds data about samples from the header
 
-bool debugMode=false;
 bool verbose=false;
 bool bigwig=false;
 int juncCount=0;
@@ -511,28 +510,27 @@ int main(int argc, char *argv[])  {
 }// <------------------ main() end -----
 
 void processOptions(int argc, char* argv[]) {
-    GArgs args(argc, argv, "help;debug;verbose;version;DVWhc:s:j:");
+    GArgs args(argc, argv, "help;verbose;version;DVWhc:s:j:");
     args.printError(USAGE, true);
-    if (args.getOpt('h') || args.getOpt("help") || args.startNonOpt()==0) {
+    if (args.getOpt('h') || args.getOpt("help")) {
         GMessage(USAGE);
         exit(1);
     }
-
-    if ((args.getOpt('c') || args.getOpt('s') || args.getOpt('j'))==0){
-        std::cerr<<"Must provide at least one argument: -c/-j/-s"<<std::endl;
-        GMessage(USAGE);
-        exit(1);
-    }
-
-    debugMode=(args.getOpt("debug")!=NULL || args.getOpt('D')!=NULL);
-    verbose=(args.getOpt("verbose")!=NULL || args.getOpt('V')!=NULL);
-    bigwig=args.getOpt('W')!=NULL;
 
     if (args.getOpt("version")) {
         fprintf(stdout,"%s\n", VERSION);
         exit(0);
     }
-    //verbose=(args.getOpt('v')!=NULL);
+
+    if ((args.getOpt('c') || args.getOpt('s') || args.getOpt('j'))==0){
+        GMessage(USAGE);
+        GMessage("\nError: at least one of -c/-j/-s arguments required!\n");
+        exit(1);
+    }
+
+    verbose=(args.getOpt("verbose")!=NULL || args.getOpt('V')!=NULL);
+    bigwig=args.getOpt('W')!=NULL;
+
     if (verbose) {
         fprintf(stderr, "Running TieCov " VERSION ". Command line:\n");
         args.printCmdLine(stderr);
@@ -545,6 +543,11 @@ void processOptions(int argc, char* argv[]) {
     jfname_bw=args.getOpt('j');
     sfname_bw=args.getOpt('s');
 
-    if (args.startNonOpt()!=1) GError("Error: no alignment file given!\n");
+    if (args.startNonOpt()==0) {
+        GMessage(USAGE);
+        GMessage("\nError: no input file provided!\n");
+        exit(1);
+    }
+    
     infname=args.nextNonOpt();
 }

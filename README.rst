@@ -79,9 +79,9 @@ many samples.
 
   tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
 
-  Input arguments
+  Input arguments:
 
-  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per each line
+  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per line
 
   Required arguments:
 
@@ -115,12 +115,19 @@ TieCov
 """"""
 
 The TieCov utility can take the output file produced by TieBrush and can generate the following auxiliary files:
+
  1. a BedGraph file with the coverage data (see http://genome.ucsc.edu/goldenPath/help/bedgraph.html); this file can be converted to BigWig (using bedGraphToBigWig) or to TDF format (using igvtools) in order to be loaded in IGV as an additional coverage track
  2. a junction BED file which can be loaded directly in IGV as an additional junction track (http://software.broadinstitute.org/software/igv/splice_junctions)
  3. a heatmap BED that uses color intensity to represent the number of samples that contain each position.
 
-  tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] in.bam
-
+  tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] input
+  
+  Input arguments (required):
+  
+   input\talignment file in SAM/BAM/CRAM format
+  
+  Optional arguments (at least one of -s/-c/-j must be specified):
+  
   -s    output BED file with an estimate of the number of samples which contain alignments for each interval.
   -c    output BedGraph (or BedWig with '-W') file with coverage for all mapped bases.
   -j    output BED file with coverage of all splice-junctions in the input file.

@@ -120,11 +120,11 @@ The TieCov utility can take the output file produced by TieBrush and can generat
 2. a junction BED file which can be loaded directly in IGV as an additional junction track (http://software.broadinstitute.org/software/igv/splice_junctions)
 3. a heatmap BED that uses color intensity to represent the number of samples that contain each position.
 
-  tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] _input_
+  tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] input
   
   Input arguments (required):
   
-  _input_     alignment file in SAM/BAM/CRAM format
+  input  alignment file in SAM/BAM/CRAM format
   
   Optional arguments (at least one of -s/-c/-j must be specified):
   

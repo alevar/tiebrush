@@ -20,7 +20,7 @@
 #ifndef TIEBRUSH_COMMONS_H
 #define TIEBRUSH_COMMONS_H
 
-bool parse_pg_sample_line(std::string& line){ // returns true if is sample pg line
+static inline bool parse_pg_sample_line(std::string& line) { // returns true if is sample pg line
     std::stringstream *line_stream = new std::stringstream(line);
     std::string col;
 
@@ -54,7 +54,7 @@ bool parse_pg_sample_line(std::string& line){ // returns true if is sample pg li
     return true;
 }
 
-void load_sample_info(sam_hdr_t* hdr,std::vector<std::string>& info){
+static inline void load_sample_info(sam_hdr_t* hdr,std::vector<std::string>& info){
     bool found_sample_line = false;
     int line_pos = 0;
     std::string line;
@@ -80,12 +80,9 @@ void load_sample_info(sam_hdr_t* hdr,std::vector<std::string>& info){
     }
 }
 
-std::string get_full_path(std::string fname){
+static inline std::string get_full_path(std::string fname) {
     const char *cur_path = fname.c_str();
-    char *actualpath;
-
-
-    actualpath = realpath(cur_path, NULL);
+    char *actualpath = realpath(cur_path, NULL);
     if (actualpath != NULL){
         return std::string(actualpath);
         free(actualpath);
@@ -137,7 +134,7 @@ public:
         if(index_ss.is_open()){
             index_ss.close();
         }
-        for(int i=0;i<this->tbd_streams.size();i++){
+        for(uint i=0;i<this->tbd_streams.size();i++){
             delete this->tbd_streams[i];
         }
     };
@@ -160,7 +157,7 @@ public:
 
     void init(std::vector<int>& lst){ // initializes file streams to the begining of each sample
         // initialize a vector of ifstreams and seek to the starting byte of each sample
-        for(int i=0;i<lst.size();i++){ // for each requested sample in the list
+        for(uint i=0;i<lst.size();i++){ // for each requested sample in the list
             std::fstream* nss;
             this->tbd_streams.push_back(nss);
 
@@ -174,7 +171,7 @@ public:
     }
 
     void next(uint32_t &dup_val, std::vector<int>& samples) { // lst is the list of samples for which to extract the values
-        for(int i=0;i<this->tbd_streams.size();i++){
+        for(uint i=0;i<this->tbd_streams.size();i++){
             if (!this->tbd_streams[i]->is_open() || !this->tbd_streams[i]->good())
                 GError("Warning: Index::next() called with no open file.\n");
             char buffer[4];

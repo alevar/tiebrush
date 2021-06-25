@@ -447,24 +447,23 @@ int main(int argc, char *argv[])  {
     int b_end=0; //bundle start, end (1-based)
     int b_start=0; //1 based
     GSamRecord brec;
-	while (samreader.next(brec)) {
+    while (samreader.next(brec)) {
         uint32_t dupcount=0;
         std::vector<int> cur_samples;
         int endpos=brec.end;
         if (brec.refId()!=prev_tid || (int)brec.start>b_end) {
-            if (coutf) {
-                flushCoverage(coutf,samreader.header(), bcov, prev_tid, b_start);
-            }
-            if(coutf_bw){
-                flushCoverage(coutf_bw,samreader.header(), bcov, prev_tid, b_start);
-            }
-            if (soutf) {
-                discretize(bsam);
-                normalize(bsam,0.1,1.5,sample_info.size());
-                flushCoverage(soutf,samreader.header(),bsam,prev_tid,b_start);
-            }
-            if (joutf) {
-                flushJuncs(joutf, samreader.refName(prev_tid));
+            if (prev_tid>=0) {
+              if (coutf)
+                  flushCoverage(coutf,samreader.header(), bcov, prev_tid, b_start);
+              if(coutf_bw)
+                  flushCoverage(coutf_bw,samreader.header(), bcov, prev_tid, b_start);
+              if (soutf) {
+                  discretize(bsam);
+                  normalize(bsam,0.1,1.5,sample_info.size());
+                  flushCoverage(soutf,samreader.header(),bsam,prev_tid,b_start);
+              }
+              if (joutf)
+                  flushJuncs(joutf, samreader.refName(prev_tid));
             }
             b_start=brec.start;
             b_end=endpos;

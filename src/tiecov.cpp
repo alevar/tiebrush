@@ -69,24 +69,6 @@ struct CJunc {
 	bool operator==(const CJunc& a) {
 		return (strand==a.strand && start==a.start && end==a.end);
 	}
-//	bool operator<(const CJunc& a) { // sort no strand
-//		if (start==a.start) return (end<a.end);
-//		else return (start<a.start);
-//	}
-
-//    bool operator<(const CJunc& a) { // sort by strand first
-//        if (strand==a.strand){
-//            if (start==a.start){
-//                return (end<a.end);
-//            }
-//            else{
-//                return (start<a.start);
-//            }
-//        }
-//        else{
-//            return strand<a.strand;
-//        }
-//    }
 
     bool operator<(const CJunc& a) { // sort by strand last
         if (start==a.start){
@@ -203,7 +185,7 @@ void addMean(GSamRecord& r, int val, std::vector<std::pair<float,uint64_t>>& bve
 }
 
 void move2bsam(std::vector<std::set<int>>& bvec_idx,std::vector<std::pair<float,uint64_t>>& bvec){
-    for(int i=0;i<bvec_idx.size();i++){
+    for(uint i=0;i<bvec_idx.size();i++){
         bvec[i].second=bvec_idx[i].size();
     }
 }
@@ -294,12 +276,12 @@ void flushCoverage(bigWigFile_t* outf,sam_hdr_t* hdr, GVec<uint64_t>& bvec,  int
 
 void flushCoverage(FILE* outf,sam_hdr_t* hdr, std::vector<std::pair<float,uint64_t>>& bvec,  int tid, int b_start) {
     if (tid<0 || b_start<=0) return;
-    int i=0;
+    uint i=0;
     b_start--; //to make it 0-based;
     while (i<bvec.size()) {
         uint64_t ival=bvec[i].second;
         float hval = bvec[i].first;
-        int j=i+1;
+        uint j=i+1;
         while (j<bvec.size() && ival==bvec[j].second) {
             j++;
         }
@@ -316,7 +298,7 @@ void discretize(std::vector<std::pair<float,uint64_t>>& bvec1){
         val.first = 0;
     }
 }
-
+/*
 void average_sample(std::vector<uint64_t>& bvec,float thresh){
     // iterate
     // find min and max of the range of values
@@ -331,7 +313,7 @@ void average_sample(std::vector<uint64_t>& bvec,float thresh){
 
     }
 }
-
+*/
 void normalize(std::vector<std::pair<float,uint64_t>>& bvec,float mint, float maxt, int num_samples){ // normalizes values to a specified range
     float denom = num_samples;
     float mult = (maxt-mint);
@@ -350,7 +332,7 @@ void load_sample_list(std::vector<int>& lst,std::string& sl_fname,std::vector<st
         sample_lst_set.insert(line);
     }
 
-    for(int i=0;i<sample_info.size();i++){ // find positions in the index to be extracted
+    for(uint i=0;i<sample_info.size();i++){ // find positions in the index to be extracted
         sl_it = sample_lst_set.find(sample_info[i]);
         if(sl_it!=sample_lst_set.end()){ // found
             lst.push_back(i);
@@ -448,7 +430,7 @@ int main(int argc, char *argv[])  {
     int b_start=0; //1 based
     GSamRecord brec;
     while (samreader.next(brec)) {
-        uint32_t dupcount=0;
+        //uint32_t dupcount=0;
         std::vector<int> cur_samples;
         int endpos=brec.end;
         if (brec.refId()!=prev_tid || (int)brec.start>b_end) {

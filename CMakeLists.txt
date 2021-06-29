@@ -51,8 +51,6 @@ link_directories("${HTS_DIR}")
 
 include(ExternalProject)
 
-message(STATUS "MAKE is: ${MAKE}")
-
 ExternalProject_Add(libdeflate
         SOURCE_DIR ${INC_DIR}/libdeflate
         BUILD_IN_SOURCE 1

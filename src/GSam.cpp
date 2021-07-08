@@ -360,6 +360,8 @@ switch (cop) {
 	start=c->pos+1; //genomic start coordinate, 1-based (BAM core.pos is 0-based)
 	int exstart=c->pos;
 	GSeg exon;
+	bool intron=false;
+	bool ins=false;
 	for (uint i = 0; i < c->n_cigar; ++i) {
 		unsigned char op = _cigOp(cigar[i]);
 		switch(op) {
@@ -368,27 +370,36 @@ switch (cop) {
 		  case BAM_CMATCH:    // M
 		  case BAM_CDEL:      // D
 		    l+=_cigLen(cigar[i]);
+		    intron=false;
+		    ins=false;
 		    break;
 		  case BAM_CREF_SKIP: // N
 		    // exon ends here
+		    if(!ins || !intron) { // insertion in the middle of an intron --> adjust last exon
+		      exon.end=c->pos+l;
+		      exon.start=exstart+1;
+		      exons.Add( exon );
+		      mapped_len+=exon.len();
+		    }
 		    has_Introns=true;
-		    exon.end=c->pos+l;
-		    exon.start=exstart+1;
-		    exons.Add( exon );
-		    mapped_len+=exon.len();
 		    l += _cigLen(cigar[i]);
 		    exstart=c->pos+l;
+		    intron=true;
 		    break;
 		  case BAM_CSOFT_CLIP: // S
 		    soft_Clipped=true;
 		    if (l) clipR=_cigLen(cigar[i]);
 		      else clipL=_cigLen(cigar[i]);
+		    intron=false; ins=false;
 		    break;
 		  case BAM_CHARD_CLIP:
 		    hard_Clipped=true;
+		    intron=false; ins=false;
 		    break;
 		  case BAM_CINS:      // I
 		    //rpos+=cl; //gpos not advanced
+		    //take care of cases where there is an ins within an intron
+		    ins=true; 
 		    break;
 		  case BAM_CPAD:
 		    //gpos+=cl;
@@ -402,7 +413,7 @@ switch (cop) {
 	exon.end=c->pos+l;
 	exons.Add(exon);
 	mapped_len+=exon.len();
-	end=c->pos+l; //genomic end coordinate
+	end=exon.end; //genomic end coordinate
  }
 
  uint8_t* GSamRecord::find_tag(const char tag[2]) {

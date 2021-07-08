@@ -105,7 +105,6 @@ struct TInputFiles {
 	// index declarations
     bool add_tb_tag_if_not_exists(sam_hdr_t *bh); // adds a line to the header which tells whether the file has been processed with tiebrush before
     void delete_all_hdr_with_tag(sam_hdr_t *hdr,std::string tag1, std::string tag2);
-    std::string get_full_path(std::string fname);
     void load_hdr_samples(sam_hdr_t* hdr,std::string filename,bool tbMerged,bool donor); // returns true if ID:SAMPLE present
     bool get_sample_from_line(std::string& line);
 	std::string headerfilename; // filename of the file which was used to construct the header

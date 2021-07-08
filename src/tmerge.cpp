@@ -1,4 +1,5 @@
 #include "tmerge.h"
+#include "commons.h"
 #include <string>
 #include <sstream>
 #include <stdlib.h>
@@ -191,23 +192,6 @@ void TInputFiles::load_hdr_samples(sam_hdr_t* hdr,std::string filename,bool tbMe
     }
 }
 
-std::string TInputFiles::get_full_path(std::string fname){
-    const char *cur_path = fname.c_str();
-    char *actualpath;
-
-
-    actualpath = realpath(cur_path, NULL);
-    if (actualpath != NULL){
-        std::string ret = actualpath;
-        free(actualpath);
-        return ret;
-    }
-    else{
-        std::cerr<<"could not resolve path: "<<fname<<std::endl;
-        exit(-1);
-    }
-}
-
 bool TInputFiles::get_sample_from_line(std::string& line){ // returns true if is sample pg line
     std::stringstream *line_stream = new std::stringstream(line);
     std::string col;
@@ -275,8 +259,6 @@ bool TInputFiles::add_tb_tag_if_not_exists(sam_hdr_t *hdr){ // returns true if t
 
 // removed all lines with matching tags
 void TInputFiles::delete_all_hdr_with_tag(sam_hdr_t *hdr,std::string tag1, std::string tag2){
-    // check if already exists
-    bool found_tb_tag_line = false;
     int line_pos = 0;
     std::string line;
     while(true){

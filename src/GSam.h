@@ -320,6 +320,14 @@ class GSamRecord: public GSeg {
    //this is the raw alignment strand, NOT the transcription/splice strand
    return ((b->core.flag & BAM_FREVERSE) != 0);
  }
+
+ char alnStrand() {
+	 return ( (b->core.flag & BAM_FREVERSE) ? '-' : '+' );
+ }
+
+ bool isPrimary() {
+	 return !(b->core.flag & BAM_FSECONDARY);
+ }
  const char* refName() {
    return (b_hdr!=NULL) ?
          ((b->core.tid<0) ? "*" : b_hdr->target_name[b->core.tid]) : NULL;

@@ -69,6 +69,24 @@ struct CJunc {
 	bool operator==(const CJunc& a) {
 		return (strand==a.strand && start==a.start && end==a.end);
 	}
+//	bool operator<(const CJunc& a) { // sort no strand
+//		if (start==a.start) return (end<a.end);
+//		else return (start<a.start);
+//	}
+
+//    bool operator<(const CJunc& a) { // sort by strand first
+//        if (strand==a.strand){
+//            if (start==a.start){
+//                return (end<a.end);
+//            }
+//            else{
+//                return (start<a.start);
+//            }
+//        }
+//        else{
+//            return strand<a.strand;
+//        }
+//    }
 
     bool operator<(const CJunc& a) { // sort by strand last
         if (start==a.start){
@@ -185,7 +203,7 @@ void addMean(GSamRecord& r, int val, std::vector<std::pair<float,uint64_t>>& bve
 }
 
 void move2bsam(std::vector<std::set<int>>& bvec_idx,std::vector<std::pair<float,uint64_t>>& bvec){
-    for(uint i=0;i<bvec_idx.size();i++){
+    for(int i=0;i<bvec_idx.size();i++){
         bvec[i].second=bvec_idx[i].size();
     }
 }
@@ -276,12 +294,12 @@ void flushCoverage(bigWigFile_t* outf,sam_hdr_t* hdr, GVec<uint64_t>& bvec,  int
 
 void flushCoverage(FILE* outf,sam_hdr_t* hdr, std::vector<std::pair<float,uint64_t>>& bvec,  int tid, int b_start) {
     if (tid<0 || b_start<=0) return;
-    uint i=0;
+    int i=0;
     b_start--; //to make it 0-based;
     while (i<bvec.size()) {
         uint64_t ival=bvec[i].second;
         float hval = bvec[i].first;
-        uint j=i+1;
+        int j=i+1;
         while (j<bvec.size() && ival==bvec[j].second) {
             j++;
         }
@@ -293,12 +311,11 @@ void flushCoverage(FILE* outf,sam_hdr_t* hdr, std::vector<std::pair<float,uint64
 
 void discretize(std::vector<std::pair<float,uint64_t>>& bvec1){
     for(auto& val : bvec1){
-        //val.second = std::ceil(val.first);
         val.second = std::ceil(val.first);
         val.first = 0;
     }
 }
-/*
+
 void average_sample(std::vector<uint64_t>& bvec,float thresh){
     // iterate
     // find min and max of the range of values
@@ -313,13 +330,13 @@ void average_sample(std::vector<uint64_t>& bvec,float thresh){
 
     }
 }
-*/
+
 void normalize(std::vector<std::pair<float,uint64_t>>& bvec,float mint, float maxt, int num_samples){ // normalizes values to a specified range
     float denom = num_samples;
     float mult = (maxt-mint);
 
     for (auto& val : bvec){
-        val.first = (val.second/denom)*mult+mint;
+        val.first = ((float)val.second/denom)*mult+mint;
     }
 }
 
@@ -332,7 +349,7 @@ void load_sample_list(std::vector<int>& lst,std::string& sl_fname,std::vector<st
         sample_lst_set.insert(line);
     }
 
-    for(uint i=0;i<sample_info.size();i++){ // find positions in the index to be extracted
+    for(int i=0;i<sample_info.size();i++){ // find positions in the index to be extracted
         sl_it = sample_lst_set.find(sample_info[i]);
         if(sl_it!=sample_lst_set.end()){ // found
             lst.push_back(i);
@@ -422,31 +439,34 @@ int main(int argc, char *argv[])  {
         fprintf(soutf, "track type=bedGraph name=\"Sample Count Heatmap\" description=\"Sample Count Heatmap\" visibility=full graphType=\"heatmap\" color=200,100,0 altColor=0,100,200\n");
     }
 
+    load_sample_info(samreader.header(),sample_info);
+
     int prev_tid=-1;
     GVec<uint64_t> bcov(2048*1024);
     std::vector<std::pair<float,uint64_t>> bsam(2048*1024,{0,1}); // number of samples. 1st - current average; 2nd - total number of values
-    std::vector<std::set<int>> bsam_idx(2048*1024,std::set<int>{}); // for indexed runs
+//    std::vector<std::set<int>> bsam_idx(2048*1024,std::set<int>{}); // for indexed runs
     int b_end=0; //bundle start, end (1-based)
     int b_start=0; //1 based
     GSamRecord brec;
-    while (samreader.next(brec)) {
-        //uint32_t dupcount=0;
+	while (samreader.next(brec)) {
+        uint32_t dupcount=0;
         std::vector<int> cur_samples;
         int endpos=brec.end;
         if (brec.refId()!=prev_tid || (int)brec.start>b_end) {
-            if (prev_tid>=0) {
-              if (coutf)
-                  flushCoverage(coutf,samreader.header(), bcov, prev_tid, b_start);
-              if(coutf_bw)
-                  flushCoverage(coutf_bw,samreader.header(), bcov, prev_tid, b_start);
-              if (soutf) {
-                  discretize(bsam);
-                  normalize(bsam,0.1,1.5,sample_info.size());
-                  flushCoverage(soutf,samreader.header(),bsam,prev_tid,b_start);
-              }
-              if (joutf)
-                  flushJuncs(joutf, samreader.refName(prev_tid));
+            if (coutf) {
+                flushCoverage(coutf,samreader.header(), bcov, prev_tid, b_start);
             }
+            if(coutf_bw){
+                flushCoverage(coutf_bw,samreader.header(), bcov, prev_tid, b_start);
+            }
+            if (soutf) {
+                discretize(bsam);
+                normalize(bsam,0,1.5,sample_info.size());
+                flushCoverage(soutf,samreader.header(),bsam,prev_tid,b_start);
+            }
+            if (joutf) {
+                flushJuncs(joutf, samreader.refName(prev_tid));
+            } // TODO: write the last column to 3 dec places
             b_start=brec.start;
             b_end=endpos;
             if (coutf || coutf_bw) {
@@ -456,8 +476,8 @@ int main(int argc, char *argv[])  {
             if (soutf) {
                 bsam.clear();
                 bsam.resize(b_end-b_start+1,{0,1});
-                bsam_idx.clear();
-                bsam_idx.resize(b_end-b_start+1,std::set<int>{});
+//                bsam_idx.clear();
+//                bsam_idx.resize(b_end-b_start+1,std::set<int>{});
             }
             prev_tid=brec.refId();
         } else { //extending current bundle
@@ -466,7 +486,7 @@ int main(int argc, char *argv[])  {
                 bcov.setCount(b_end-b_start+1, (int)0);
                 if (soutf){
                     bsam.resize(b_end-b_start+1,{0,1});
-                    bsam_idx.resize(b_end-b_start+1,std::set<int>{});
+//                    bsam_idx.resize(b_end-b_start+1,std::set<int>{});
                 }
             }
         }
@@ -480,7 +500,7 @@ int main(int argc, char *argv[])  {
         }
 
         if(soutf){
-            addSamples(brec,cur_samples,bsam_idx,b_start);
+//            addSamples(brec,cur_samples,bsam_idx,b_start);
             float accYX = 0;
             accYX = (float)brec.tag_int("YX", 1);
             addMean(brec, accYX, bsam, b_start);

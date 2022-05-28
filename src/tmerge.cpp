@@ -58,7 +58,7 @@ bool TInputFiles::addSam(GSamReader* r, int fidx) {
     //requirement: all files must have the same number of SQ entries in the same order!
     kstring_t hd_line = KS_INITIALIZE;
     int res = sam_hdr_find_hd(r->header(), &hd_line);
-    if (res < 0) GError("Error: failed to get @HD line from header!\n");
+    if (res < 0) GError("Error: failed to get @HD line from header (%s)!\n",  r->fileName());
     //check for SO:coordinate
     kstring_t str = KS_INITIALIZE;
     if (sam_hdr_find_tag_hd(r->header(), "SO", &str)
@@ -68,7 +68,7 @@ bool TInputFiles::addSam(GSamReader* r, int fidx) {
     ks_free(&hd_line);
     bool tb_file=false; //was this file a product of TieBrush? (already merged)
     res=sam_hdr_find_tag_id(r->header(), "PG", "PN", "TieBrush", "VN", &str);
-    if (res<-1) GError("Error: failed to lookup @PG line in header!\n");
+    if (res<-1) GError("Error: failed to get @PG line in header (%s)!\n",  r->fileName());
     if (res==0) {
         tb_file=true;
 #ifdef _DEBUG

@@ -29,6 +29,10 @@ with their counts across many samples.
 
     Ales Varabyou, Geo Pertea, Christopher Pockrandt, Mihaela Pertea, TieBrush: an efficient method for aggregating and summarizing mapped reads across large datasets, Bioinformatics, 2021;, btab342, https://doi.org/10.1093/bioinformatics/btab342
 
+Sahimi plot is largely based on the implementation from the MISO package. please cite both the TieBrush publication as well as the original MISO paper:
+
+    Katz, Yarden, Eric T. Wang, Jacob Silterra, Schraga Schwartz, Bang Wong, Helga Thorvaldsdóttir, James T. Robinson, Jill P. Mesirov, Edoardo M. Airoldi, and Christopher B. Burge. "Quantitative visualization of alternative exon expression from RNA-seq data." Bioinformatics 31, no. 14 (2015): 2400-2402.
+
 Installation
 ^^^^^^^^^^^^
 
@@ -40,21 +44,23 @@ fixed releases of any dependencies are fetched and compiled with the software.
 
 ::
 
-    $ git clone https://github.com/alevar/tiebrush.git --recursive
+    $ git clone --recursive https://github.com/alevar/tiebrush.git
     $ cd tiebrush/
-    $ cmake -DCMAKE_BUILD_TYPE=Release .
+    $ mkdir build && cd build
+    $ cmake -DCMAKE_BUILD_TYPE=Release ..
     $ make -j4
+    $ make test #optional 
     $ make install
+
+If you are using a very old version of Git (< 1.6.5) the flag ``--recursive`` does not exist.
+In this case you need to clone the submodule separately  (``git submodule update --init --recursive``).
 
 For a fully static build `-DTIEBRUSH_STATIC_BUILD=1` needs to be added to the list of arguments
 in the cmake command.
 
-By default make install will likely require administrative privileges. To specify custom
+By default `make install` will require administrative privileges. To specify a custom
 installation path `-DCMAKE_INSTALL_PREFIX=<custom/installation/path>` needs to be added to
-the list of arguments in the cmake command.
-
-If you are using a very old version of Git (< 1.6.5) the flag ``--recursive`` does not exist.
-In this case you need to clone the submodule separately  (``git submodule update --init --recursive``).
+the list of arguments in the `cmake` command.
 
 **Requirements**
 

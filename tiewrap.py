@@ -29,9 +29,9 @@ def build_base_cmd(args):
     if args.max_nh:
         tb_cmd.append("-N")
         tb_cmd.append(str(args.max_nh))
-    if args.max_map_qual:
+    if args.min_map_qual:
         tb_cmd.append("-Q")
-        tb_cmd.append(str(args.max_map_qual))
+        tb_cmd.append(str(args.min_map_qual))
     if args.flags:
         tb_cmd.append("-F")
         tb_cmd.append(str(args.flags))

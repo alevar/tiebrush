@@ -15,7 +15,7 @@
 #include "GSam.h"
 #include <libBigWig/bigWig.h>
 
-#define VERSION "0.0.6"
+#define VERSION "0.0.7"
 
 const char* USAGE="TieCov v" VERSION "\n"
 "==================\n"
@@ -57,13 +57,13 @@ std::vector<std::string> sample_info; // holds data about samples from the heade
 
 bool verbose=false;
 bool bigwig=false;
-int juncCount=0;
+int juncCount=0; //keep track of the output junction count (distinct junctions)
 
 struct CJunc {
 	int start, end;
 	char strand;
-	uint64_t dupcount;
-	CJunc(int vs=0, int ve=0, char vstrand='+', uint64_t dcount=1):
+	uint64_t dupcount; //junction coverage
+	CJunc(int vs=0, int ve=0, char vstrand='+', uint64_t dcount=1, uint32_t scount=1):
 	  start(vs), end(ve), strand(vstrand), dupcount(dcount) { }
 
 	bool operator==(const CJunc& a) {

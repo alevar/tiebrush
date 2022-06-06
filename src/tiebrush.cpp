@@ -10,7 +10,7 @@
 #include "tmerge.h"
 #include <gclib/GBitVec.h>
 
-#define VERSION "0.0.6"
+#define VERSION "0.0.7"
 
 const char* USAGE = "TieBrush v" VERSION "\n"
                               "==================\n"
@@ -37,8 +37,8 @@ const char* USAGE = "TieBrush v" VERSION "\n"
                               "  --version\t\tShow the program version and exit\n"
                               "  -L,--full\t\tIf enabled, only reads with the same CIGAR\n"
                               "           \t\tand MD strings will be grouped and collapsed.\n"
-                              "           \t\tBy default, TieBrush will consider the CIGAR\n"
-                              "           \t\tstring only when grouping reads\n"
+                              "           \t\tBy default, TieBrush considers only the CIGAR\n"
+                              "           \t\tstring when grouping reads\n"
                               "           \t\tOnly one of -L, -P or -E options can be enabled\n"
                               "  -P,--clip\t\tIf enabled, reads will be grouped by clipped\n"
                               "           \t\tCIGAR string. In this mode 5S10M5S and 3S10M3S\n"

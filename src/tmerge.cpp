@@ -317,7 +317,7 @@ int TInputFiles::start(){
     }
 
     for (int i=0;i<freaders.Count();++i) {
-        GSamReader* samrd=new GSamReader(freaders[i]->fname.chars(),
+        GSamReader* samrd=new GSamReader(freaders[i]->fname.chars(), NULL,
                                          SAM_QNAME|SAM_FLAG|SAM_RNAME|SAM_POS|SAM_CIGAR|SAM_AUX);
         bool tb_merged=addSam(samrd, i); //merge SAM headers etc.
 

@@ -505,7 +505,7 @@ void flushPData(GList<SPData>& spdlst){ //write spdata to outfile
 }
 
 bool passes_options(GSamRecord* brec){
-    if(!options.keep_supplementary && brec->get_b()->core.flag & 0x100) return false;
+    if(!options.keep_supplementary && (brec->get_b()->core.flag & 0x100)) return false;
     if(!options.keep_unmapped && brec->isUnmapped()) return false;
     if(brec->mapq()<options.min_qual) return false;
     int nh = brec->tag_int("NH");

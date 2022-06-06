@@ -73,17 +73,14 @@ static inline void load_sample_info(sam_hdr_t* hdr,std::vector<std::string>& inf
 static inline std::string get_full_path(std::string fname){
     const char *cur_path = fname.c_str();
     char *actualpath;
-
-
     actualpath = realpath(cur_path, NULL);
-    if (actualpath != NULL){
-        return std::string(actualpath);
+    if (actualpath != NULL) {
+        std::string fullpath(actualpath);
         free(actualpath);
+        return fullpath;
     }
-    else{
-        std::cerr<<"could not resolve path: "<<fname<<std::endl;
-        exit(-1);
-    }
+    else GError("Error: could not resolve path: %s\n", fname.c_str());
+    return "";
 }
 
 struct Index_Builder{

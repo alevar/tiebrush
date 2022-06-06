@@ -634,8 +634,8 @@ void processOptions(int argc, char* argv[]) {
     }
     const char* ifn=NULL;
     while ( (ifn=args.nextNonOpt())!=NULL) {
-        //input alignment files
-        std::string absolute_ifn = get_full_path(ifn);
-        inRecords.addFile(absolute_ifn.c_str());
+        //-- input alignment files
+        std::string abs_ifn = get_full_path(ifn);
+        inRecords.addFile(abs_ifn.c_str());
     }
 }

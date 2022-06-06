@@ -365,7 +365,7 @@ int main(int argc, char *argv[])  {
     //htsFile* hts_file=hts_open(infname.chars(), "r");
     //if (hts_file==NULL)
     //   GError("Error: could not open alignment file %s \n",infname.chars());
-	GSamReader samreader(infname.chars(), SAM_QNAME|SAM_FLAG|SAM_RNAME|SAM_POS|SAM_CIGAR|SAM_AUX);
+	GSamReader samreader(infname.chars(), NULL, SAM_QNAME|SAM_FLAG|SAM_RNAME|SAM_POS|SAM_CIGAR|SAM_AUX);
 
     if (!covfname.is_empty()) {
        if (covfname=="-" || covfname=="stdout")
@@ -456,7 +456,7 @@ int main(int argc, char *argv[])  {
             if (coutf) {
                 flushCoverage(coutf,samreader.header(), bcov, prev_tid, b_start);
             }
-            if(coutf_bw){
+            if(coutf_bw) {
                 flushCoverage(coutf_bw,samreader.header(), bcov, prev_tid, b_start);
             }
             if (soutf) {
@@ -464,7 +464,7 @@ int main(int argc, char *argv[])  {
                 normalize(bsam,0,1.5,sample_info.size());
                 flushCoverage(soutf,samreader.header(),bsam,prev_tid,b_start);
             }
-            if (joutf) {
+            if (joutf && junctions.Count()) {
                 flushJuncs(joutf, samreader.refName(prev_tid));
             } // TODO: write the last column to 3 dec places
             b_start=brec.start;
@@ -577,6 +577,6 @@ void processOptions(int argc, char* argv[]) {
         GMessage("\nError: no input file provided!\n");
         exit(1);
     }
-    
+
     infname=args.nextNonOpt();
 }

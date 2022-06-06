@@ -5,7 +5,7 @@ project(tiebrush)
 
 set(CMAKE_CXX_STANDARD 11)
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fpermissive -DNOCURL=1")
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -std=c++11 -fpermissive -DNOCURL=1")
 
 option(TIEBRUSH_BUILD_LIBBIGWIG "Turn on/off building step of libBigWig (used for bioconda)." ON)
 if (NOT TIEBRUSH_BUILD_LIBBIGWIG)

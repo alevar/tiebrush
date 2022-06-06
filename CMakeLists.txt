@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.9)
 project(tiebrush)
+
+#enable_testing() #-- required for add_test()
+
+set(CMAKE_CTEST_ARGUMENTS "--verbose")
 
 # set (CMAKE_STATIC_LINKER_FLAGS "-Wl,--as-needed.-lcurl")
 
@@ -118,6 +122,13 @@ add_executable(tiecov src/tiecov.cpp
 
 add_dependencies(tiecov libdeflate htslib libBigWig)
 
+add_custom_target(test
+    COMMAND ./run_tests.sh
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_dependencies(test tiebrush tiecov)
+
 if (APPLE AND TIEBRUSH_STATIC_BUILD)
     target_link_libraries(tiecov ${INC_DIR}/libBigWig/libBigWig.a ${HTS_DIR}/libhts.a ${HTS_DIR}/libdeflate.a z lzma bz2 pthread)
 else ()
@@ -127,3 +138,4 @@ endif ()
 install(TARGETS tiebrush DESTINATION ${CMAKE_INSTALL_PREFIX})
 install(TARGETS tiecov DESTINATION ${CMAKE_INSTALL_PREFIX})
 install(PROGRAMS tiewrap.py DESTINATION ${CMAKE_INSTALL_PREFIX})
+

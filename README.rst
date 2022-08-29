@@ -1,4 +1,4 @@
-TieBrush and TieCov - efficient methods for aggregating and summarizing aligned sequences across large datasets
+TieBrush, TieCov and Sashimi - efficient methods for aggregating and summarizing aligned sequences across large datasets
 ===============================================================================================================
 
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
@@ -11,6 +11,8 @@ TieBrush and TieCov - efficient methods for aggregating and summarizing aligned 
 
 Introduction
 ^^^^^^^^^^^^
+
+.. image:: https://raw.githubusercontent.com/alevar/tiebrush/master/example/slc25a3.sim.png?sanitize=true
 
 TieBrush is a simple yet efficient method for merging redundant information from multiple alignment files, 
 designed to enable rapid manipulation of extremely large sequencing datasets. The method is specifically 
@@ -182,6 +184,8 @@ as well as the concurrency parameters can be set explicitely.
 Sashimi
 """""""
 
+.. image:: https://raw.githubusercontent.com/alevar/tiebrush/master/example_sashimi/example.svg?sanitize=true
+
 Sashimi.py is a small utility script provided to create vectorized visualizzation of a locus, taking full advantage of the files created by TieBrush suite.
 
 Sashimi plot is largely based on the implementation from the MISO package. please cite both the TieBrush publication as well as the original MISO paper:
@@ -212,19 +216,27 @@ You must have matplotlib, adjustText and numpy installed to run sashimi.py with 
       --intron_scale INTRON_SCALE   intron_scale
       --exon_scale EXON_SCALE   exon_scale
       --resolution RESOLUTION   resolution
-      --fig_width FIG_WIDTH fig_width
-      --fig_height FIG_HEIGHT   fig_height
-      --junction_log_base JUNCTION_LOG_BASE junction_log_base
-      --font_size FONT_SIZE fig_height
+      --fig_width   FIG_WIDTH fig_width
+      --fig_height  FIG_HEIGHT   fig_height
+      --junction_log_base   JUNCTION_LOG_BASE junction_log_base
+      --font_size   FONT_SIZE fig_height
       --nyticks NYTICKS     nyticks
       --nxticks NXTICKS     nxticks
-      --ymax YMAX           ymax
+      --ymax    YMAX           ymax
       --logged              logged - False by default
       --number_junctions    number_junctions - True by default
       --reverse_minus       reverse_minus - False by default
       --show_ylabel         show_ylabel - True by default
       --show_xlabel         show_xlabel - True by default
       --sans_serif          sans_serif - False by default
-      --bar_color BAR_COLOR Color specified in any matplotlib-compatable format
-
+      --bar_color   BAR_COLOR Color specified in any matplotlib-compatible format
+      --title   TITLE [TITLE ...]
+                            Title of the figure
+      --pickle              Save a pickle alongside the figure which can be loaded into a separate instance
+                            of matplotlib for modification.
+      --compare COMPARE     Users can specify one of the input transcripts to serve as a reference. If set,
+                            all transcripts in the input will be compared to the reference and plotted
+                            using a dedicated color palette. The comparison will visualize in-frame and
+                            out-of-frame positions as well as any intervals missing and extra between the
+                            reference and each query transcript
 

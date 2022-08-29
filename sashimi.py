@@ -2,17 +2,135 @@
 
 import numpy as np
 import argparse
+import pickle
 import sys
 import os
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
+from matplotlib.patches import Patch
 from matplotlib.patches import PathPatch
 from matplotlib.gridspec import GridSpec
 from adjustText import adjust_text
+
+import seaborn as sns
 mpl.use('Agg')
 
+def intersect(s1,s2):
+    res = [0,-1,0]
+    tis = max(s1[0],s2[0])
+    tie = min(s1[1],s2[1])
+    if(tis<=tie):
+        res[0] = tis
+        res[1] = tie
+        return (tie-tis)+1,res
+    return 0,res
+
+def split(s1,s2):
+    left  = [0,-1,-1]
+    right = [0,-1,-1]
+
+    il,inter = intersect(s1,s2)
+    if il>0:
+        if inter[0]>s1[0]:
+            left[0] = s1[0]
+            left[1] = inter[0]-1
+            left[2] = s1[2]
+        if inter[1]<s1[1]:
+            right[0] = inter[1]+1
+            right[1] = s1[1]
+            right[2] = s1[2]
+    else:
+        if s1[0]<s2[0]:
+            left = s1
+        else:
+            right = s1
+
+    return left,inter,right
+
+def slen(s):
+    return (s[1]-s[0])+1
+
+def clen(chain):
+    res = 0
+    for c in chain:
+        res+=slen(c)
+    return res
+
+def compare(i1,i2):
+    intervals = []
+    for i in i1:
+        intervals.append([i[0],i[1]])
+        intervals[-1].append(-1)
+    for i in i2:
+        intervals.append([i[0],i[1]])
+        intervals[-1].append(1)
+    intervals.sort()
+
+    if len(i1)==0 and len(i2)==0:
+        return []
+
+    stack = []
+    stack.append(intervals[0])
+    for i in intervals[1:]:
+
+        left,inter,right = split(stack[-1],i)
+        if slen(right)>0:
+            assert slen(inter)==slen(i) # must be intirely contained within
+        else:
+            tmp,inter2,right = split(i,stack[-1])
+            if(slen(tmp)>0):
+                t2 = stack[-1]
+                stack[-1]=tmp
+                stack.append(t2)
+
+            else:
+                assert slen(tmp)<=0,str(tmp)+","+str(inter2)+","+str(right)
+            assert inter==inter2
+
+        stack.pop()
+
+        if slen(left)>0:
+            stack.append(left)
+        if slen(inter)>0:
+            inter[2] = 0
+            stack.append(inter)
+        if slen(right)>0:
+            stack.append(right)
+
+    return stack
+
+# runs compare() funciton and labels all matches as in and out of frame accordingly
+def compare_label_frame(chain1,chain2,strand):
+    if chain2 is np.nan or len(chain2)==0:
+        [[x[0],x[1],-1] for x in chain1]
+    if chain1 is np.nan or len(chain1)==0:
+        [[x[0],x[1],1] for x in chain2]
+
+    mod_chain = compare(chain1,chain2)
+
+    if strand=="-":
+        mod_chain.reverse()
+
+    t_frame = 0
+    q_frame = 0
+
+    for mc in mod_chain:
+        if (mc[2] == -1): # extra positions in the query
+            q_frame += slen(mc)
+        elif (mc[2] == 1): # template positions missing from the query
+            t_frame += slen(mc)
+        elif (mc[2] == 0): # matching positions between query and template
+            if (q_frame % 3 == t_frame % 3):
+                mc[2] = 100 # inframe
+            else:
+                mc[2] = -100 # outframe
+        else:
+            print("wrong code: "+str(mc[2]))
+            return
+
+    return mod_chain
 
 class TX:
     def __init__(self):
@@ -104,6 +222,7 @@ class TX:
 class Locus:
     def __init__(self):
         self.txs = list()
+        self.ref_tx = None
         self.seqid = None
         self.strand = None
 
@@ -150,7 +269,7 @@ class Locus:
         return p0 * (1 - t) ** 3 + 3 * t * p1 * (1 - t) ** 2 + \
                3 * t ** 2 * (1 - t) * p2 + t ** 3 * p3
 
-    def add_tx(self, tx):
+    def add_tx(self, tx, ref=False):
         assert self.seqid is None or self.seqid == tx.get_seqid(), "mismatching seqids"
         assert self.strand is None or self.strand == tx.get_strand(), "mismatching strands"
 
@@ -170,6 +289,9 @@ class Locus:
             intron[0] = e
 
         self.txs.append(tx)
+
+        if ref:
+            self.ref_tx = len(self.txs)-1
 
     def set_scaling(self):
         # get graphcoords
@@ -290,17 +412,22 @@ class Locus:
     def get_coords_str(self):
         return self.seqid + self.strand + ":" + str(self.get_start()) + "-" + str(self.get_end())
 
-    def plot(self,out_fname,title=None):
+    def plot(self,out_fname,title,save_pickle,compare):
         assert self.num_sj_tracks==self.num_cov_tracks or self.num_sj_tracks==0,"incompatible number of splice junciton and coverage tracks - the numebrs should either be the same or no splice junction tracks provided at all"
-        
+
         color_dens = "#ffb703"
         color_spines = "#fb8500"
-        color_exon = "#023047"
-        color_cds = "#219ebc"
+        colors_compare = {-1:(sns.color_palette("colorblind")[2],"Missing From Reference"),
+                          1:(sns.color_palette("colorblind")[7],"Extra In Reference"),
+                          100:(sns.color_palette("colorblind")[9],"Matching In Frame"),
+                          -100:(sns.color_palette("colorblind")[3],"Matching Out Of Frame"),
+                          0:("#023047","Non-Coding Positions")}
+        colors_non_compare = {100:(sns.color_palette("colorblind")[9],"Coding Positions"),
+                              0:("#023047","Non-Coding Positions")}
 
         hrs = [4]*self.num_cov_tracks+[1 for i in range(len(self.txs))]
         gs1hs = 1
-        gs2hs = 0.3
+        gs2hs = 0.4
 
         fig = plt.figure(figsize=(self.settings["fig_width"],self.settings["fig_height"]))
 
@@ -382,25 +509,36 @@ class Locus:
 
         locus_start = self.get_start()
 
-        gs2 = GridSpec(len(self.txs)+self.num_cov_tracks, 1,height_ratios=hrs)
-        gs2.update(hspace=gs2hs)
+        # gs2 = GridSpec(len(self.txs)+self.num_cov_tracks, 1,height_ratios=hrs)
+        gs1.update(hspace=gs2hs)
         for i,tx in enumerate(self.txs):
-            ax2 = plt.subplot(gs2[i+self.num_cov_tracks,:])
+            ax2 = plt.subplot(gs1[i+self.num_cov_tracks,:])
             ax2.set_xlabel(tx.get_tid(),fontsize=self.settings["font_size"])
 
-            for s, e in tx.orf:
-                s = s - locus_start
-                e = e - locus_start
-                x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
-                y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
-                ax2.fill(x, y,color=color_cds, lw=.5, zorder=30)
+            if compare and self.ref_tx is not None:
+                stack = compare_label_frame(tx.orf,self.txs[self.ref_tx].orf,self.strand)
+
+                for s, e, l in stack:
+                    s = s - locus_start
+                    e = e - locus_start
+                    x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
+                    y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
+                    ax2.fill(x, y,color=colors_compare[l][0], lw=.5, zorder=30)
+
+            else:
+                for s, e in tx.orf:
+                    s = s - locus_start
+                    e = e - locus_start
+                    x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
+                    y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
+                    ax2.fill(x, y,color=colors_non_compare[100], lw=.5, zorder=30)
 
             for s, e in tx.exons:
                 s = s - locus_start
                 e = e - locus_start
                 x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                 y = [-exonwidth / 8, -exonwidth / 8, exonwidth / 8, exonwidth / 8]
-                ax2.fill(x, y, color=color_exon, lw=.5, zorder=20)
+                ax2.fill(x, y, color=colors_non_compare[0][0], lw=.5, zorder=20)
 
             # Draw intron.
             tx_start = tx.get_start() - locus_start
@@ -408,7 +546,7 @@ class Locus:
 
             hline_left = self.graphcoords[tx_start]/max(self.graphcoords)
             hline_right = self.graphcoords[tx_end]/max(self.graphcoords)
-            ax2.axhline(0,xmin=hline_left,xmax=hline_right, color=color_exon, lw=2)
+            ax2.axhline(0,xmin=hline_left,xmax=hline_right, color=colors_non_compare[0][0], lw=2)
 
             # Draw intron arrows.
             spread = .2 * max(self.graphcoords) / narrows
@@ -420,7 +558,7 @@ class Locus:
                     x = [loc + spread, loc, loc + spread]
                 y = [-exonwidth / 20, 0, exonwidth / 20]
                 if x[0]>=self.graphcoords[tx_start] and x[0]<=self.graphcoords[tx_end]:
-                    ax2.plot(x, y, lw=2, color=color_exon)
+                    ax2.plot(x, y, lw=2, color=colors_non_compare[0][0])
 
             ax2.set_xlim(0, max(self.graphcoords))
             plt.box(on=False)
@@ -432,7 +570,24 @@ class Locus:
             plt.suptitle(title,wrap=True)
 
         plt.subplots_adjust(hspace=.5, wspace=.7)
-        plt.savefig(out_fname)
+
+        handles = [Patch(color=c[0],label=c[1]) for i,c in colors_non_compare.items()]
+        if compare:
+            handles = [Patch(color=c[0],label=c[1]) for i,c in colors_compare.items()]
+
+        lgd = plt.legend(handles=handles,
+                       fontsize=self.settings["font_size"],
+                       loc="lower left",
+                       bbox_to_anchor=(0., -2.02, 1., .102),
+                       ncol=2,
+                       mode="expand",
+                       borderaxespad=0.)
+
+        if save_pickle:
+            with open(out_fname+".pickle","wb") as outFP:
+                pickle.dump((fig,gs1),outFP)
+
+        plt.savefig(out_fname,bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 
 def sashimi(args):
@@ -463,6 +618,8 @@ def sashimi(args):
     locus = Locus()
     locus.set_settings(settings)
 
+    found_ref = False
+
     with open(args.gtf, "r") as inFP:
         cur_tid = None
         cur_tid_lines = ""
@@ -480,7 +637,11 @@ def sashimi(args):
                 assert tid not in tids_seen, "mixed tids"
                 tx = TX()
                 tx.parse_from_gtf(cur_tid_lines)
-                locus.add_tx(tx)
+
+                is_ref = args.compare is not None and tx.get_tid()==args.compare
+                found_ref = found_ref or is_ref
+                locus.add_tx(tx,is_ref)
+
                 cur_tid = tid
                 cur_tid_lines = line
 
@@ -489,9 +650,15 @@ def sashimi(args):
 
         tx = TX()
         tx.parse_from_gtf(cur_tid_lines)
-        locus.add_tx(tx)
+        is_ref = args.compare is not None and tx.get_tid()==args.compare
+        found_ref = found_ref or is_ref
+        locus.add_tx(tx,is_ref)
 
     locus.set_scaling()
+
+    if compare and not found_ref:
+        print("could not find the reference transcript for comparison: "+args.compare)
+        exit(1)
 
     # read in only values for which the transcriptome has been constructed
     is_cov_lst_file = args.cov is not None
@@ -536,7 +703,7 @@ def sashimi(args):
     title = None
     if not args.title is None:
         title = " ".join(args.title)
-    locus.plot(args.output,title)
+    locus.plot(args.output,title,args.pickle,args.compare)
 
 
 def main(args):
@@ -638,6 +805,15 @@ def main(args):
                         nargs='+',
                         default=None,
                         help="Title of the figure")
+    parser.add_argument("--pickle",
+                        required=False,
+                        action="store_true",
+                        help="Save a pickle alongside the figure which can be loaded into a separate instance of matplotlib for modification.")
+    parser.add_argument("--compare",
+                        required=False,
+                        type=str,
+                        help="Users can specify one of the input transcripts to serve as a reference. If set, all transcripts in the input will be compared to the reference and plotted using a dedicated color pallete. The comparison will visualize in-frame and out-of-frame positions as well as any intervals missing and extra between the reference and each query transcript")
+
 
     parser.set_defaults(func=sashimi)
     args = parser.parse_args()

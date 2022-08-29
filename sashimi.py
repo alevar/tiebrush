@@ -323,7 +323,7 @@ class Locus:
                     continue
 
                 intron = (int(lcs[1]), int(lcs[2]) + 1)
-                if intron in self.introns:
+                if intron in self.introns or self.settings["all_junctions"]:
                     self.intron_cov_lst[-1][intron] = int(lcs[4])
 
         self.num_sj_tracks+=1
@@ -611,7 +611,11 @@ def sashimi(args):
                 "show_ylabel": args.show_ylabel,
                 "show_xlabel": args.show_xlabel,
                 "sans_serif": args.sans_serif,
-                "bar_color": args.bar_color}
+                "bar_color": args.bar_color,
+                "title": args.title,
+                "pickle": args.pickle,
+                "compare": args.compare,
+                "all_juncitons": args.all_junctions}
 
     tids_seen = set()
 
@@ -813,7 +817,10 @@ def main(args):
                         required=False,
                         type=str,
                         help="Users can specify one of the input transcripts to serve as a reference. If set, all transcripts in the input will be compared to the reference and plotted using a dedicated color pallete. The comparison will visualize in-frame and out-of-frame positions as well as any intervals missing and extra between the reference and each query transcript")
-
+    parser.add_argument("--all-junctions",
+                        required=False,
+                        action="store_true",
+                        help="Will force the script to display all junctions, including those not present in the GTF")
 
     parser.set_defaults(func=sashimi)
     args = parser.parse_args()

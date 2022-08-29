@@ -239,4 +239,6 @@ You must have matplotlib, adjustText and numpy installed to run sashimi.py with 
                             using a dedicated color palette. The comparison will visualize in-frame and
                             out-of-frame positions as well as any intervals missing and extra between the
                             reference and each query transcript
+      --all-junctions       Will force the script to display all junctions, including those not present in
+                            the GTF
 

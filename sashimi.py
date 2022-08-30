@@ -535,7 +535,7 @@ class Locus:
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
-                    ax2.fill(x, y,color=colors_non_compare[100], lw=.5, zorder=30)
+                    ax2.fill(x, y,color=colors_non_compare[100][0], lw=.5, zorder=30)
 
             for s, e in tx.exons:
                 s = s - locus_start
@@ -657,7 +657,8 @@ def sashimi(args):
 
     locus.set_scaling()
 
-    if compare and not found_ref:
+    print(args.compare)
+    if args.compare is not None and not found_ref:
         print("could not find the reference transcript for comparison: "+args.compare)
         exit(1)
 

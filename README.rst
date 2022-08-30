@@ -196,49 +196,38 @@ You must have matplotlib, adjustText and numpy installed to run sashimi.py with 
 
     pip3 install matplotlib adjustText numpy
 
-    sashimi.py [-h] --gtf GTF [--cov COV] [--sj SJ] -o OUTPUT [--intron_scale INTRON_SCALE]
-                  [--exon_scale EXON_SCALE] [--resolution RESOLUTION] [--fig_width FIG_WIDTH]
-                  [--fig_height FIG_HEIGHT] [--junction_log_base JUNCTION_LOG_BASE]
-                  [--font_size FONT_SIZE] [--nyticks NYTICKS] [--nxticks NXTICKS] [--ymax YMAX]
-                  [--logged] [--number_junctions] [--reverse_minus] [--show_ylabel] [--show_xlabel]
-                  [--sans_serif] [--bar_color BAR_COLOR]
+    sashimi.py [-h] --gtf GTF [--cov COV] [--sj SJ] -o OUTPUT [--intron_scale INTRON_SCALE] 
+                  [--exon_scale EXON_SCALE] [--resolution RESOLUTION] [--fig_width FIG_WIDTH] 
+                  [--fig_height FIG_HEIGHT] [--font_size FONT_SIZE] [--nxticks NXTICKS] 
+                  [--number_junctions] [--reverse] [--title TITLE [TITLE ...]] [--pickle] 
+                  [--compare COMPARE] [--all-junctions]
 
     options:
       -h, --help            show this help message and exit
       --gtf GTF             annotation in a GFF/GTF format
-      --cov COV             coverage in bedgraph format or a file containing a list of filenames with
-                            coverage in bedgraph for multiple samples. If a list is provided - the files
-                            should be in the same order as the splice junctions below (if provided)
-      --sj SJ               splice junctions in bed format or a file containing a list of filenames with
-                            splice junctions in bed format for multiple samples. If a list is provided -
-                            the files should be in the same order as the coverage tracks.
-      -o OUTPUT, --output OUTPUT    output basename
-      --intron_scale INTRON_SCALE   intron_scale
-      --exon_scale EXON_SCALE   exon_scale
-      --resolution RESOLUTION   resolution
-      --fig_width   FIG_WIDTH fig_width
-      --fig_height  FIG_HEIGHT   fig_height
-      --junction_log_base   JUNCTION_LOG_BASE junction_log_base
-      --font_size   FONT_SIZE fig_height
-      --nyticks NYTICKS     nyticks
-      --nxticks NXTICKS     nxticks
-      --ymax    YMAX           ymax
-      --logged              logged - False by default
-      --number_junctions    number_junctions - True by default
-      --reverse_minus       reverse_minus - False by default
-      --show_ylabel         show_ylabel - True by default
-      --show_xlabel         show_xlabel - True by default
-      --sans_serif          sans_serif - False by default
-      --bar_color   BAR_COLOR Color specified in any matplotlib-compatible format
-      --title   TITLE [TITLE ...]
-                            Title of the figure
-      --pickle              Save a pickle alongside the figure which can be loaded into a separate instance
-                            of matplotlib for modification.
-      --compare COMPARE     Users can specify one of the input transcripts to serve as a reference. If set,
-                            all transcripts in the input will be compared to the reference and plotted
-                            using a dedicated color palette. The comparison will visualize in-frame and
-                            out-of-frame positions as well as any intervals missing and extra between the
-                            reference and each query transcript
-      --all-junctions       Will force the script to display all junctions, including those not present in
-                            the GTF
-
+      --cov COV             coverage in bedgraph format or a file containing a list of filenames with coverage in bedgraph for multiple samples. If a list is provided - the files should be in the same order as the
+                            splice junctions below (if provided)
+      --sj SJ               splice junctions in bed format or a file containing a list of filenames with splice junctions in bed format for multiple samples. If a list is provided - the files should be in the same
+                            order as the coverage tracks.
+      -o OUTPUT, --output OUTPUT
+                            Filename for the output figure. The format (png,svg, ...) will be automatically deduced based on the extension.
+      --intron_scale INTRON_SCALE
+                            Parameter regulating the scaling of the introns (Default: 20). Decreasing the integer value will scale introns down in size compared to exons.
+      --exon_scale EXON_SCALE
+                            Parameter regulating the scaling of the exons (Default: 1). Increasing the integer value will scale exons down in size compared to introns.
+      --resolution RESOLUTION
+                            Parameter regulates the smoothing factor of the coverage track (Default: 6). Increasing the value will increasing the smoothing by reducing the number of points on the coverage track.
+      --fig_width FIG_WIDTH
+                            Width of the figure in inches (Default: 20).
+      --fig_height FIG_HEIGHT
+                            Height of the figure in inches (Default: 10).
+      --font_size FONT_SIZE
+                            Size of the font (Default: 18)
+      --nxticks NXTICKS     Number of positional markers to include on the x-axis with labels (Default: 4).
+      --number_junctions    Disables labels idicating coverage of splice junctions
+      --reverse             Flips image horizontally, which is equivalent to setting strand to the opposite value.
+      --title   TITLE [TITLE ...] Title of the figure.
+      --pickle              Save a pickle alongside the figure which can be loaded into a separate instance of matplotlib for modification.
+      --compare COMPARE     Users can specify one of the input transcripts to serve as a reference. If set, all transcripts in the input will be compared to the reference and plotted using a dedicated color
+                            pallete. The comparison will visualize in-frame and out-of-frame positions as well as any intervals missing and extra between the reference and each query transcript
+      --all-junctions       Will force the script to display all junctions, including those not present in the GTF

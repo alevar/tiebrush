@@ -14,7 +14,6 @@ from matplotlib.patches import PathPatch
 from matplotlib.gridspec import GridSpec
 from adjustText import adjust_text
 
-import seaborn as sns
 mpl.use('Agg')
 
 def intersect(s1,s2):
@@ -297,7 +296,7 @@ class Locus:
         # get graphcoords
         if self.graphcoords is None:
             self.graphcoords, self.graphToGene = self.getScaling(self.settings["intron_scale"], self.settings["exon_scale"],
-                                                                 self.settings["reverse_minus"])
+                                                                 self.settings["reverse"])
             
     def get_start(self):
         return self.intervals[0][0]
@@ -415,14 +414,15 @@ class Locus:
     def plot(self,out_fname,title,save_pickle,compare):
         assert self.num_sj_tracks==self.num_cov_tracks or self.num_sj_tracks==0,"incompatible number of splice junciton and coverage tracks - the numebrs should either be the same or no splice junction tracks provided at all"
 
+        # sns.color_palette("colorblind").as_hex()[3]
         color_dens = "#ffb703"
         color_spines = "#fb8500"
-        colors_compare = {-1:(sns.color_palette("colorblind")[2],"Missing From Reference"),
-                          1:(sns.color_palette("colorblind")[7],"Extra In Reference"),
-                          100:(sns.color_palette("colorblind")[9],"Matching In Frame"),
-                          -100:(sns.color_palette("colorblind")[3],"Matching Out Of Frame"),
+        colors_compare = {-1:("#029e73","Missing From Reference"),
+                          1:("#949494","Extra In Reference"),
+                          100:("#56b4e9","Matching In Frame"),
+                          -100:("#d55e00","Matching Out Of Frame"),
                           0:("#023047","Non-Coding Positions")}
-        colors_non_compare = {100:(sns.color_palette("colorblind")[9],"Coding Positions"),
+        colors_non_compare = {100:("#56b4e9","Coding Positions"),
                               0:("#023047","Non-Coding Positions")}
 
         hrs = [4]*self.num_cov_tracks+[1 for i in range(len(self.txs))]
@@ -442,6 +442,7 @@ class Locus:
             ax.fill_between(self.covx_lst[c], self.cov_lst[c],y2=0, color=color_dens, lw=0)
 
             maxheight = max(self.cov_lst[c])
+
             ymax = 1.1 * maxheight
             ymin = -.5 * ymax
 
@@ -555,7 +556,7 @@ class Locus:
             spread = .2 * max(self.graphcoords) / narrows
             for i in range(narrows):
                 loc = float(i) * max(self.graphcoords) / narrows
-                if tx.get_strand() == '+' or self.settings["reverse_minus"]:
+                if tx.get_strand() == '+' or self.settings["reverse"]:
                     x = [loc - spread, loc, loc - spread]
                 else:
                     x = [loc + spread, loc, loc + spread]
@@ -601,21 +602,13 @@ def sashimi(args):
 
     settings = {"intron_scale": args.intron_scale,
                 "exon_scale": args.exon_scale,
-                "logged": args.logged,
-                "ymax": args.ymax,
                 "number_junctions": args.number_junctions,
                 "resolution": args.resolution,
                 "fig_width": args.fig_width,
                 "fig_height": args.fig_height,
-                "junction_log_base": args.junction_log_base,
-                "reverse_minus": args.reverse_minus,
+                "reverse": args.reverse,
                 "font_size": args.font_size,
-                "nyticks": args.nyticks,
                 "nxticks": args.nxticks,
-                "show_ylabel": args.show_ylabel,
-                "show_xlabel": args.show_xlabel,
-                "sans_serif": args.sans_serif,
-                "bar_color": args.bar_color,
                 "title": args.title,
                 "pickle": args.pickle,
                 "compare": args.compare,
@@ -728,91 +721,55 @@ def main(args):
     parser.add_argument("-o",
                         "--output",
                         required=True,
-                        help="output basename")
+                        help="Filename for the output figure. The format (png,svg, ...) will be automatically deduced based on the extension.")
     parser.add_argument("--intron_scale",
                         required=False,
                         type=int,
                         default=20,
-                        help="intron_scale")
+                        help="Parameter regulating the scaling of the introns (Default: 20). Decreasing the integer value will scale introns down in size compared to exons.")
     parser.add_argument("--exon_scale",
                         required=False,
                         type=int,
                         default=1,
-                        help="exon_scale")
+                        help="Parameter regulating the scaling of the exons (Default: 1). Increasing the integer value will scale exons down in size compared to introns.")
     parser.add_argument("--resolution",
                         required=False,
                         type=int,
                         default=6,
-                        help="resolution")
+                        help="Parameter regulates the smoothing factor of the coverage track (Default: 6). Increasing the value will increasing the smoothing by reducing the number of points on the coverage track.")
     parser.add_argument("--fig_width",
                         required=False,
                         type=int,
                         default=20,
-                        help="fig_width")
+                        help="Width of the figure in inches (Default: 20).")
     parser.add_argument("--fig_height",
                         required=False,
                         type=int,
                         default=10,
-                        help="fig_height")
-    parser.add_argument("--junction_log_base",
-                        required=False,
-                        type=float,
-                        default=10.,
-                        help="junction_log_base")
+                        help="Height of the figure in inches (Default: 10).")
     parser.add_argument("--font_size",
                         required=False,
                         type=int,
                         default=18,
-                        help="fig_height")
-    parser.add_argument("--nyticks",
-                        required=False,
-                        type=int,
-                        default=3,
-                        help="nyticks")
+                        help="Size of the font (Default: 18)")
     parser.add_argument("--nxticks",
                         required=False,
                         type=int,
                         default=4,
-                        help="nxticks")
-    parser.add_argument("--ymax",
-                        required=False,
-                        type=int,
-                        default=None,
-                        help="ymax")
-    parser.add_argument("--logged",
-                        action="store_true",
-                        required=False,
-                        help="logged - False by default")
+                        help="Number of positional markers to include on the x-axis with labels (Default: 4).")
     parser.add_argument("--number_junctions",
                         action="store_false",
                         required=False,
-                        help="number_junctions - True by default")
-    parser.add_argument("--reverse_minus",
+                        help="Disables labels idicating coverage of splice junctions")
+    parser.add_argument("--reverse",
                         required=False,
                         action="store_true",
-                        help="reverse_minus - False by default")
-    parser.add_argument("--show_ylabel",
-                        required=False,
-                        action="store_false",
-                        help="show_ylabel - True by default")
-    parser.add_argument("--show_xlabel",
-                        required=False,
-                        action="store_false",
-                        help="show_xlabel - True by default")
-    parser.add_argument("--sans_serif",
-                        required=False,
-                        action="store_true",
-                        help="sans_serif - False by default")
-    parser.add_argument("--bar_color",
-                        required=False,
-                        type=str,
-                        default="k",
-                        help="bar_color")
+                        help="Flips image horizontally, which is equivalent to setting strand to the opposite value.")
     parser.add_argument("--title",
                         required=False,
                         nargs='+',
                         default=None,
-                        help="Title of the figure")
+                        help="Title of the figure.")
     parser.add_argument("--pickle",
                         required=False,
                         action="store_true",

@@ -523,7 +523,10 @@ class Locus:
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
-                    ax2.fill(x, y,color=colors_compare[l][0], lw=.5, zorder=30)
+                    if l==1:
+                        ax2.fill(x, y,linestyle="-",color=colors_compare[l][0],lw=2,zorder=30,fill=False)
+                    else:
+                        ax2.fill(x, y,color=colors_compare[l][0], lw=.5, zorder=30)
 
             else:
                 for s, e in tx.orf:
@@ -574,6 +577,7 @@ class Locus:
         handles = [Patch(color=c[0],label=c[1]) for i,c in colors_non_compare.items()]
         if compare:
             handles = [Patch(color=c[0],label=c[1]) for i,c in colors_compare.items()]
+            handles[1] = Patch(edgecolor=colors_compare[1][0],facecolor=None,fill=False,linestyle="-",linewidth=3,label=colors_compare[1][1])
 
         lgd = plt.legend(handles=handles,
                        fontsize=self.settings["font_size"],
@@ -615,7 +619,7 @@ def sashimi(args):
                 "title": args.title,
                 "pickle": args.pickle,
                 "compare": args.compare,
-                "all_juncitons": args.all_junctions}
+                "all_junctions": args.all_junctions}
 
     tids_seen = set()
 

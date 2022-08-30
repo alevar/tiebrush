@@ -139,6 +139,20 @@ class TX:
         self.orf = []
 
         self.tid = None
+        self.dummy = False
+
+    def set_seqid(self,seqid):
+        self.seqid = seqid
+    def set_strand(self,strand):
+        self.strand = strand
+    def set_exons(self,exons):
+        self.exons = exons
+    def set_orf(self,orf):
+        self.orf = orf
+    def set_tid(self,tid):
+        self.tid = tid
+    def set_dummy(self,dummy):
+        self.dummy=dummy
 
     def parse_from_gtf(self, gtf_lines):
         for line in gtf_lines.split("\n"):
@@ -297,7 +311,7 @@ class Locus:
         if self.graphcoords is None:
             self.graphcoords, self.graphToGene = self.getScaling(self.settings["intron_scale"], self.settings["exon_scale"],
                                                                  self.settings["reverse"])
-            
+
     def get_start(self):
         return self.intervals[0][0]
 
@@ -513,6 +527,9 @@ class Locus:
         # gs2 = GridSpec(len(self.txs)+self.num_cov_tracks, 1,height_ratios=hrs)
         gs1.update(hspace=gs2hs)
         for i,tx in enumerate(self.txs):
+            if tx.dummy: # skip any dummies
+                continue
+
             ax2 = plt.subplot(gs1[i+self.num_cov_tracks,:])
             ax2.set_xlabel(tx.get_tid(),fontsize=self.settings["font_size"])
 
@@ -581,12 +598,12 @@ class Locus:
             handles[1] = Patch(edgecolor=colors_compare[1][0],facecolor=None,fill=False,linestyle="-",linewidth=3,label=colors_compare[1][1])
 
         lgd = plt.legend(handles=handles,
-                       fontsize=self.settings["font_size"],
-                       loc="lower left",
-                       bbox_to_anchor=(0., -2.02, 1., .102),
-                       ncol=2,
-                       mode="expand",
-                       borderaxespad=0.)
+                         fontsize=self.settings["font_size"],
+                         loc="lower left",
+                         bbox_to_anchor=(0., -2.02, 1., .102),
+                         ncol=2,
+                         mode="expand",
+                         borderaxespad=0.)
 
         if save_pickle:
             with open(out_fname+".pickle","wb") as outFP:
@@ -594,6 +611,46 @@ class Locus:
 
         plt.savefig(out_fname,bbox_extra_artists=(lgd,), bbox_inches='tight')
 
+# gets minimum and maximum values from BED/bedgraph files
+def get_MinMax_val(fname,seqid,strand):
+    sj_fname_lst = []
+    is_sj_lst_file = True
+    if fname is not None:
+        with open(fname,"r") as inFP:
+            for line in inFP:
+                tmp = line.strip()
+                if not os.path.exists(tmp) and len(tmp)>0:
+                    is_sj_lst_file = False
+                    break
+
+        if is_sj_lst_file:
+            with open(fname,"r") as inFP:
+                for line in inFP:
+                    tmp = line.strip()
+                    if len(tmp)>0:
+                        sj_fname_lst.append(tmp)
+        else:
+            sj_fname_lst.append(fname)
+
+
+        intron_starts = []
+        intron_ends = []
+        for sf in sj_fname_lst:
+            with open(sf, "r") as inFP:
+                for line in inFP:
+                    lcs = line.strip().split("\t")
+                    if not len(lcs) == 6:
+                        continue
+
+                    if not lcs[0] == seqid:
+                        continue
+
+                    if not lcs[5] == strand:
+                        continue
+
+                    intron_starts.append(int(lcs[1]))
+                    intron_ends.append(int(lcs[2])+1)
+    return min(intron_starts),max(intron_ends)
 
 def sashimi(args):
     assert os.path.exists(args.gtf), "GTF does not exist: " + args.gtf
@@ -655,9 +712,22 @@ def sashimi(args):
         found_ref = found_ref or is_ref
         locus.add_tx(tx,is_ref)
 
+    # if requested - read junctions and create a dummy transcript spanning min to max junc/transcript values
+    if args.all_junctions and args.sj is not None:
+        min_val,max_val = get_MinMax_val(args.sj,locus.seqid,locus.strand)
+        dummy_start = min(min_val-1,locus.get_start())
+        dummy_end = max(max_val+1,locus.get_end())
+        tx = TX()
+        tx.set_seqid(locus.seqid)
+        tx.set_strand(locus.strand)
+        tx.set_exons([(dummy_start,dummy_end)])
+        tx.set_orf([])
+        tx.set_tid("dummy")
+        tx.set_dummy(True)
+        locus.add_tx(tx,False)
+
     locus.set_scaling()
 
-    print(args.compare)
     if args.compare is not None and not found_ref:
         print("could not find the reference transcript for comparison: "+args.compare)
         exit(1)

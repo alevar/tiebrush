@@ -586,6 +586,11 @@ class Locus:
                     else:
                         ax2.fill(x, y,color=colors_compare[l][0], lw=.5, zorder=30)
 
+                if self.ref_tx == i:
+                    x = [self.graphcoords[0], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[0]]
+                    y = [-exonwidth / 5, -exonwidth / 5, exonwidth / 5, exonwidth / 5]
+                    ax2.fill(x, y,linestyle="-",color="xkcd:salmon",alpha=0.15,lw=2,zorder=30,fill=True)
+
             else:
                 for s, e in tx.orf:
                     s = s - locus_start
@@ -611,8 +616,8 @@ class Locus:
 
             # Draw intron arrows.
             spread = .2 * max(self.graphcoords) / narrows
-            for i in range(narrows):
-                loc = float(i) * max(self.graphcoords) / narrows
+            for im in range(narrows):
+                loc = float(im) * max(self.graphcoords) / narrows
                 if tx.get_strand() == '+' or self.settings["reverse"]:
                     x = [loc - spread, loc, loc - spread]
                 else:

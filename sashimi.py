@@ -140,7 +140,24 @@ class TX:
 
         self.tid = None
         self.dummy = False
+        self.store_cds = True
 
+        self.attrs = dict()
+
+    def clear(self):
+        self.seqid = None
+        self.strand = None
+        self.exons = []
+        self.orf = []
+
+        self.tid = None
+        self.dummy = False
+        self.store_cds = True
+
+        self.attrs = dict()
+
+    def set_nocds(self):
+        self.store_cds = False
     def set_seqid(self,seqid):
         self.seqid = seqid
     def set_strand(self,strand):
@@ -171,11 +188,17 @@ class TX:
             assert self.tid == txid, "transcript IDs do not match. function accepts a single transcript entry only"
 
             if lcs[2].lower() == "transcript" or lcs[2].lower() == "mrna":
+                # extract attributes
+                for av in lcs[8].strip().rstrip(";").split(";"):
+                    # print(lcs[8].strip().rstrip(";"),av)
+                    k,v = av.strip().rstrip("\"").split(" \"")
+                    assert k not in self.attrs,"duplicate attribute key: "+k+" in: "+lcs[8].strip()
+                    self.attrs[k]=v
                 continue
 
             if lcs[2].lower() == "exon":
                 self.exons.append((int(lcs[3]), int(lcs[4])))
-            if lcs[2].lower() == "cds":
+            if self.store_cds and lcs[2].lower() == "cds":
                 self.orf.append((int(lcs[3]), int(lcs[4])))
 
         # sort exons and orf
@@ -206,6 +229,9 @@ class TX:
 
     def get_tid(self):
         return self.tid
+
+    def get_attr(self,attr):
+        return self.attrs.get(attr,"")
 
     def get_strand(self):
         return self.strand
@@ -283,8 +309,8 @@ class Locus:
                3 * t ** 2 * (1 - t) * p2 + t ** 3 * p3
 
     def add_tx(self, tx, ref=False):
-        assert self.seqid is None or self.seqid == tx.get_seqid(), "mismatching seqids"
-        assert self.strand is None or self.strand == tx.get_strand(), "mismatching strands"
+        assert self.seqid is None or self.seqid == tx.get_seqid(), "mismatching seqids: "+tx.get_tid()
+        assert self.strand is None or self.strand == tx.get_strand(), "mismatching strands: "+tx.get_tid()
 
         self.seqid = tx.get_seqid()
         self.strand = tx.get_strand()
@@ -425,7 +451,7 @@ class Locus:
     def get_coords_str(self):
         return self.seqid + self.strand + ":" + str(self.get_start()) + "-" + str(self.get_end())
 
-    def plot(self,out_fname,title,save_pickle,compare):
+    def plot(self,out_fname,title,save_pickle,compare,legend,text_attr):
         assert self.num_sj_tracks==self.num_cov_tracks or self.num_sj_tracks==0,"incompatible number of splice junciton and coverage tracks - the numebrs should either be the same or no splice junction tracks provided at all"
 
         # sns.color_palette("colorblind").as_hex()[3]
@@ -439,11 +465,19 @@ class Locus:
         colors_non_compare = {100:("#56b4e9","Coding Positions"),
                               0:("#023047","Non-Coding Positions")}
 
-        hrs = [4]*self.num_cov_tracks+[1 for i in range(len(self.txs))]
+
+        height_ratio_cov2tx = 0
+        try:
+            height_ratio_cov2tx = (self.settings["cov_height"]/self.settings["tx_height"])/self.num_cov_tracks
+        except:
+            pass
+
+        hrs = [height_ratio_cov2tx]*self.num_cov_tracks+[1 for i in range(len(self.txs))]
         gs1hs = 1
         gs2hs = 0.4
 
-        fig = plt.figure(figsize=(self.settings["fig_width"],self.settings["fig_height"]))
+        fig_height = (self.settings["tx_height"]*len(self.txs)) + (self.settings["cov_height"]*self.num_cov_tracks)
+        fig = plt.figure(figsize=(self.settings["fig_width"],fig_height))
 
         gs1 = GridSpec(len(self.txs)+self.num_cov_tracks, 1, height_ratios=hrs)
         if self.num_cov_tracks>0:
@@ -531,7 +565,13 @@ class Locus:
                 continue
 
             ax2 = plt.subplot(gs1[i+self.num_cov_tracks,:])
-            ax2.set_xlabel(tx.get_tid(),fontsize=self.settings["font_size"])
+            xlabel = tx.get_tid()
+            if text_attr != "transcript_id":
+                ta = tx.get_attr(text_attr)
+                if len(ta)>0:
+                    xlabel += " : "+tx.get_attr(text_attr)
+
+            ax2.set_xlabel(xlabel,fontsize=self.settings["font_size"])
 
             if compare and self.ref_tx is not None:
                 stack = compare_label_frame(tx.orf,self.txs[self.ref_tx].orf,self.strand)
@@ -588,28 +628,31 @@ class Locus:
 
 
         if not title is None:
-            plt.suptitle(title,wrap=True)
+            plt.suptitle(title,wrap=True,fontsize=self.settings["font_size"]*1.25)
 
         plt.subplots_adjust(hspace=.5, wspace=.7)
 
-        handles = [Patch(color=c[0],label=c[1]) for i,c in colors_non_compare.items()]
-        if compare:
-            handles = [Patch(color=c[0],label=c[1]) for i,c in colors_compare.items()]
-            handles[1] = Patch(edgecolor=colors_compare[1][0],facecolor=None,fill=False,linestyle="-",linewidth=3,label=colors_compare[1][1])
+        if legend:
+            handles = [Patch(color=c[0],label=c[1]) for i,c in colors_non_compare.items()]
+            if compare:
+                handles = [Patch(color=c[0],label=c[1]) for i,c in colors_compare.items()]
+                handles[1] = Patch(edgecolor=colors_compare[1][0],facecolor=None,fill=False,linestyle="-",linewidth=3,label=colors_compare[1][1])
 
-        lgd = plt.legend(handles=handles,
-                         fontsize=self.settings["font_size"],
-                         loc="lower left",
-                         bbox_to_anchor=(0., -2.02, 1., .102),
-                         ncol=2,
-                         mode="expand",
-                         borderaxespad=0.)
+            lgd = plt.legend(handles=handles,
+                             fontsize=self.settings["font_size"],
+                             loc="lower left",
+                             bbox_to_anchor=(0., -2.02, 1., .102),
+                             ncol=2,
+                             mode="expand",
+                             borderaxespad=0.)
 
-        if save_pickle:
-            with open(out_fname+".pickle","wb") as outFP:
-                pickle.dump((fig,gs1),outFP)
+            if save_pickle:
+                with open(out_fname+".pickle","wb") as outFP:
+                    pickle.dump((fig,gs1),outFP)
 
-        plt.savefig(out_fname,bbox_extra_artists=(lgd,), bbox_inches='tight')
+            plt.savefig(out_fname,bbox_extra_artists=(lgd,), bbox_inches='tight')
+        else:
+            plt.savefig(out_fname)
 
 # gets minimum and maximum values from BED/bedgraph files
 def get_MinMax_val(fname,seqid,strand):
@@ -662,7 +705,8 @@ def sashimi(args):
                 "number_junctions": args.number_junctions,
                 "resolution": args.resolution,
                 "fig_width": args.fig_width,
-                "fig_height": args.fig_height,
+                "tx_height": args.tx_height,
+                "cov_height": args.cov_height,
                 "reverse": args.reverse,
                 "font_size": args.font_size,
                 "nxticks": args.nxticks,
@@ -694,6 +738,8 @@ def sashimi(args):
             if not cur_tid == tid:
                 assert tid not in tids_seen, "mixed tids"
                 tx = TX()
+                if args.nocds:
+                    tx.set_nocds()
                 tx.parse_from_gtf(cur_tid_lines)
 
                 is_ref = args.compare is not None and tx.get_tid()==args.compare
@@ -707,6 +753,8 @@ def sashimi(args):
                 cur_tid_lines += line
 
         tx = TX()
+        if args.nocds:
+            tx.set_nocds()
         tx.parse_from_gtf(cur_tid_lines)
         is_ref = args.compare is not None and tx.get_tid()==args.compare
         found_ref = found_ref or is_ref
@@ -775,7 +823,7 @@ def sashimi(args):
     title = None
     if not args.title is None:
         title = " ".join(args.title)
-    locus.plot(args.output,title,args.pickle,args.compare)
+    locus.plot(args.output,title,args.pickle,args.compare,args.legend,args.text_attr)
 
 
 def main(args):
@@ -793,6 +841,10 @@ def main(args):
                         "--output",
                         required=True,
                         help="Filename for the output figure. The format (png,svg, ...) will be automatically deduced based on the extension.")
+    parser.add_argument("-c",
+                        "--nocds",
+                        action="store_true",
+                        help="If enabled, will display no CDS features in the output plots.")
     parser.add_argument("--intron_scale",
                         required=False,
                         type=int,
@@ -813,11 +865,16 @@ def main(args):
                         type=int,
                         default=20,
                         help="Width of the figure in inches (Default: 20).")
-    parser.add_argument("--fig_height",
+    parser.add_argument("--tx_height",
                         required=False,
                         type=int,
-                        default=10,
-                        help="Height of the figure in inches (Default: 10).")
+                        default=2,
+                        help="Height of the transcript elements in the figure in inches (Default: 2).")
+    parser.add_argument("--cov_height",
+                        required=False,
+                        type=int,
+                        default=5,
+                        help="Height of the coverage elements in the figure in inches (Default: 5).")
     parser.add_argument("--font_size",
                         required=False,
                         type=int,
@@ -853,6 +910,14 @@ def main(args):
                         required=False,
                         action="store_true",
                         help="Will force the script to display all junctions, including those not present in the GTF")
+    parser.add_argument("--text_attr",
+                        required=False,
+                        type=str,
+                        default="transcript_id",
+                        help="If specified, the value will determine which attribute key will be used as text displayed for each transcript along with the transcript ID.")
+    parser.add_argument("--legend",
+                        action="store_true",
+                        help="Add legend to the plot")
 
     parser.set_defaults(func=sashimi)
     args = parser.parse_args()

@@ -484,8 +484,12 @@ class Locus:
             gs1.update(hspace=gs1hs)
 
         for c in range(self.num_cov_tracks):
+
             final_plot = c==self.num_cov_tracks-1
             ax = plt.subplot(gs1[c,:])
+
+            if c==0 and not title is None:
+                ax.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
 
             ax.fill_between(self.covx_lst[c], self.cov_lst[c],y2=0, color=color_dens, lw=0)
 
@@ -565,6 +569,10 @@ class Locus:
                 continue
 
             ax2 = plt.subplot(gs1[i+self.num_cov_tracks,:])
+
+            if i==0 and not title is None and self.num_cov_tracks==0:
+                ax2.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
+
             xlabel = tx.get_tid()
             if text_attr != "transcript_id":
                 ta = tx.get_attr(text_attr)
@@ -632,8 +640,8 @@ class Locus:
             ax2.set_yticks([])
 
 
-        if not title is None:
-            plt.suptitle(title,wrap=True,fontsize=self.settings["font_size"]*1.25)
+        # if not title is None:
+            # plt.suptitle(title,wrap=True,fontsize=self.settings["font_size"]*1.25)
 
         plt.subplots_adjust(hspace=.5, wspace=.7)
 
@@ -657,7 +665,7 @@ class Locus:
 
             plt.savefig(out_fname,bbox_extra_artists=(lgd,), bbox_inches='tight')
         else:
-            plt.savefig(out_fname)
+            plt.savefig(out_fname, bbox_inches='tight')
 
 # gets minimum and maximum values from BED/bedgraph files
 def get_MinMax_val(fname,seqid,strand):

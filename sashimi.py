@@ -268,6 +268,7 @@ class Locus:
         self.intervals = []  # union of all exons in the locus (minus the introns)
         self.introns = dict()
         self.intron_cov_lst = list()
+        self.track_names = list()
 
         self.exon_starts = []
         self.exon_ends = []
@@ -344,10 +345,24 @@ class Locus:
     def get_end(self):
         return self.intervals[-1][1]
 
-    def add_introns(self, sj_fname):
+    def add_track_names(self,name_fname):
+        assert os.path.exists(name_fname),"Track name file does not exist"
+
+        if os.path.exists(name_fname):
+            with open(name_fname, "r") as inFP:
+                for line in inFP:
+                    self.track_names.append(line.strip())
+        else:
+            self.track_names.append(name_fname)
+
+    def add_introns(self,sj_fname):
         assert os.path.exists(sj_fname),"Splice Junction track does not exist"
 
         self.intron_cov_lst.append(dict())
+
+        total_sj_cov = 0
+        max_sj_cov = 0
+        min_sj_cov = sys.maxsize
 
         with open(sj_fname, "r") as inFP:
             for line in inFP:
@@ -363,7 +378,17 @@ class Locus:
 
                 intron = (int(lcs[1]), int(lcs[2]) + 1)
                 if intron in self.introns or self.settings["all_junctions"]:
-                    self.intron_cov_lst[-1][intron] = int(lcs[4])
+                    self.intron_cov_lst[-1][intron] = [int(lcs[4])]
+                    total_sj_cov += int(lcs[4])
+                    max_sj_cov = max(max_sj_cov,int(lcs[4]))
+                    min_sj_cov = min(min_sj_cov,int(lcs[4]))
+
+        factor = total_sj_cov/len(self.intron_cov_lst[-1])
+        for k,v in self.intron_cov_lst[-1].items():
+            self.intron_cov_lst[-1][k].append(round(self.intron_cov_lst[-1][k][0]/factor,2))
+            top = self.intron_cov_lst[-1][k][0]
+            bottom = max(0.1,max_sj_cov)
+            self.intron_cov_lst[-1][k].append((top/bottom)*100000)
 
         self.num_sj_tracks+=1
 
@@ -451,7 +476,7 @@ class Locus:
     def get_coords_str(self):
         return self.seqid + self.strand + ":" + str(self.get_start()) + "-" + str(self.get_end())
 
-    def plot(self,out_fname,title,save_pickle,compare,legend,text_attr):
+    def plot(self,out_fname,title,save_pickle,compare,legend,text_attr,rel):
         assert self.num_sj_tracks==self.num_cov_tracks or self.num_sj_tracks==0,"incompatible number of splice junciton and coverage tracks - the numebrs should either be the same or no splice junction tracks provided at all"
 
         # sns.color_palette("colorblind").as_hex()[3]
@@ -510,8 +535,8 @@ class Locus:
                     mid = (ss1 + ss2) / 2
                     h = -3 * ymin / 4
 
-                    leftdens = self.cov_full_lst[c][int(ss1)]
-                    rightdens = self.cov_full_lst[c][int(ss2)]
+                    leftdens = self.cov_full_lst[c][leftss - self.get_start()-1]
+                    rightdens = self.cov_full_lst[c][rightss - self.get_start()]
 
                     pts = [(ss1, leftdens),
                            (ss1, leftdens + h),
@@ -521,10 +546,11 @@ class Locus:
                     midpt = Locus.cubic_bezier(pts, .5)
 
                     if self.settings["number_junctions"]:
-                        annotations.append(ax.annotate('%s'%(val), xy=(midpt[0], midpt[1]), xytext=(midpt[0], midpt[1]+.3),fontsize=self.settings["font_size"]))
+                        sj_v = val[1] if rel else val[0]
+                        annotations.append(ax.annotate('%s'%(sj_v), xy=(midpt[0], midpt[1]), xytext=(midpt[0], midpt[1]+.3),fontsize=self.settings["font_size"]))
 
                     pp1 = PathPatch(Path(pts,[Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]),
-                                    ec=color_spines, lw=np.log(val + 1) / np.log(10), fc='none')
+                                    ec=color_spines, lw=np.log(val[2] + 1) / np.log(10), fc='none')
 
                     ax.add_patch(pp1)
 
@@ -556,6 +582,7 @@ class Locus:
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
             ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c]))
             ax.yaxis.set_ticks_position('left')
+            ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])
 
         exonwidth = .3
         narrows = 50
@@ -813,7 +840,7 @@ def sashimi(args):
         else:
             locus.add_coverage(args.cov)
 
-    # add coverage
+    # add junctions
     is_sj_lst_file = True
     if args.sj is not None:
         with open(args.sj,"r") as inFP:
@@ -833,25 +860,41 @@ def sashimi(args):
         else:
             locus.add_introns(args.sj)
 
+    # add track names
+    if args.tn is not None:
+        locus.add_track_names(args.tn)
+
     title = None
     if not args.title is None:
         title = " ".join(args.title)
-    locus.plot(args.output,title,args.pickle,args.compare,args.legend,args.text_attr)
+    locus.plot(args.output,title,args.pickle,args.compare,args.legend,args.text_attr,args.rel)
 
 
 def main(args):
     parser = argparse.ArgumentParser(description='''Help Page''')
     parser.add_argument("--gtf",
                         required=True,
-                        help="annotation in a GFF/GTF format")
+                        type=str,
+                        help="Annotation in a GFF/GTF format")
     parser.add_argument("--cov",
                         required=False,
-                        help="coverage in bedgraph format or a file containing a list of filenames with coverage in bedgraph for multiple samples. If a list is provided - the files should be in the same order as the splice junctions below (if provided)")
+                        type=str,
+                        help="Coverage in bedgraph format or a file containing a list of filenames with coverage in bedgraph for multiple samples. If a list is provided - the files should be in the same order as the splice junctions below (if provided)")
     parser.add_argument("--sj",
                         required=False,
-                        help="splice junctions in bed format or a file containing a list of filenames with splice junctions in bed format for multiple samples. If a list is provided - the files should be in the same order as the coverage tracks.")
+                        type=str,
+                        help="Splice junctions in bed format or a file containing a list of filenames with splice junctions in bed format for multiple samples. If a list is provided - the files should be in the same order as the coverage tracks.")
+    parser.add_argument("--tn",
+                        required=False,
+                        type=str,
+                        help="Names for the coverage/junction tracks. If a list is provided - the files should be in the same order as the coverage tracks.")
+    parser.add_argument("--rel",
+                        action="store_true",
+                        required=False,
+                        help="Display junciton coverage valus as relative usage of the junction compared to average junciton usage.")
     parser.add_argument("-o",
                         "--output",
+                        type=str,
                         required=True,
                         help="Filename for the output figure. The format (png,svg, ...) will be automatically deduced based on the extension.")
     parser.add_argument("-c",
@@ -871,8 +914,8 @@ def main(args):
     parser.add_argument("--resolution",
                         required=False,
                         type=int,
-                        default=6,
-                        help="Parameter regulates the smoothing factor of the coverage track (Default: 6). Increasing the value will increasing the smoothing by reducing the number of points on the coverage track.")
+                        default=5,
+                        help="Parameter regulates the smoothing factor of the coverage track (Default: 5). Increasing the value will increasing the smoothing by reducing the number of points on the coverage track.")
     parser.add_argument("--fig_width",
                         required=False,
                         type=int,

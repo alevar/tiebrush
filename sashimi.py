@@ -383,7 +383,11 @@ class Locus:
                     max_sj_cov = max(max_sj_cov,int(lcs[4]))
                     min_sj_cov = min(min_sj_cov,int(lcs[4]))
 
-        factor = total_sj_cov/len(self.intron_cov_lst[-1])
+        factor = 0.00001
+        try:
+            factor = total_sj_cov/len(self.intron_cov_lst[-1])
+        except:
+            pass
         for k,v in self.intron_cov_lst[-1].items():
             self.intron_cov_lst[-1][k].append(round(self.intron_cov_lst[-1][k][0]/factor,2))
             top = self.intron_cov_lst[-1][k][0]
@@ -493,7 +497,7 @@ class Locus:
 
         height_ratio_cov2tx = 0
         try:
-            height_ratio_cov2tx = (self.settings["cov_height"]/self.settings["tx_height"])/self.num_cov_tracks
+            height_ratio_cov2tx = self.settings["cov_height"]/self.settings["tx_height"]
         except:
             pass
 
@@ -577,10 +581,14 @@ class Locus:
                               fontsize=coords_fontsize)
 
 
+            h = -3 * ymin / 3
+
             ax.set_ylabel("Coverage",fontsize=self.settings["font_size"])
-            ax.spines["left"].set_bounds(0, max(self.cov_full_lst[c]))
+            ax.spines["left"].set_bounds(0, max(self.cov_full_lst[c])+h)
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
-            ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c]))
+
+
+            ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c])+h)
             ax.yaxis.set_ticks_position('left')
             ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])
 
@@ -929,8 +937,8 @@ def main(args):
     parser.add_argument("--cov_height",
                         required=False,
                         type=int,
-                        default=5,
-                        help="Height of the coverage elements in the figure in inches (Default: 5).")
+                        default=3,
+                        help="Height of the coverage elements in the figure in inches (Default: 3).")
     parser.add_argument("--font_size",
                         required=False,
                         type=int,

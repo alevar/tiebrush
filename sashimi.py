@@ -346,8 +346,6 @@ class Locus:
         return self.intervals[-1][1]
 
     def add_track_names(self,name_fname):
-        assert os.path.exists(name_fname),"Track name file does not exist"
-
         if os.path.exists(name_fname):
             with open(name_fname, "r") as inFP:
                 for line in inFP:
@@ -480,42 +478,55 @@ class Locus:
     def get_coords_str(self):
         return self.seqid + self.strand + ":" + str(self.get_start()) + "-" + str(self.get_end())
 
-    def plot(self,out_fname,title,save_pickle,compare,legend,text_attr,rel):
-        assert self.num_sj_tracks==self.num_cov_tracks or self.num_sj_tracks==0,"incompatible number of splice junciton and coverage tracks - the numebrs should either be the same or no splice junction tracks provided at all"
-
-        # sns.color_palette("colorblind").as_hex()[3]
-        color_dens = "#ffb703"
-        color_spines = "#fb8500"
-        colors_compare = {-1:("#029e73","Missing From Reference"),
-                          1:("#949494","Extra In Reference"),
-                          100:("#56b4e9","Matching In Frame"),
-                          -100:("#d55e00","Matching Out Of Frame"),
-                          0:("#023047","Non-Coding Positions")}
-        colors_non_compare = {100:("#56b4e9","Coding Positions"),
-                              0:("#023047","Non-Coding Positions")}
-
-
+    @staticmethod
+    def scale_val(v, min_new, max_new, min_cur, max_cur):
+        return (max_new - min_new) * (v - min_cur) / (max_cur - min_cur) + min_new;
+        
+    # build general gridspace
+    # build general grid and populate axis
+    # populate data for each
+    # separate funciton to draw zoom boxes
+    
+    def build_gridspace(self,fig):
+        gs_main = None
+        if self.settings["zoom"]:
+            gs_main = GridSpec(2, 1, figure=fig, height_ratios=[3,1], hspace=0.25)
+        else:
+            gs_main = GridSpec(1, 1, figure=fig)
+        
+        return gs_main
+        
+    def build_cov_tx_grid(self,fig,gs):
         height_ratio_cov2tx = 0
         try:
             height_ratio_cov2tx = self.settings["cov_height"]/self.settings["tx_height"]
         except:
             pass
-
-        hrs = [height_ratio_cov2tx]*self.num_cov_tracks+[1 for i in range(len(self.txs))]
-        gs1hs = 1
-        gs2hs = 0.4
-
-        fig_height = (self.settings["tx_height"]*len(self.txs)) + (self.settings["cov_height"]*self.num_cov_tracks)
-        fig = plt.figure(figsize=(self.settings["fig_width"],fig_height))
-
-        gs1 = GridSpec(len(self.txs)+self.num_cov_tracks, 1, height_ratios=hrs)
+        
+        # first separate into cov and tx sections
+        gs_sub_cov = None
+        gs_sub_tx = None
         if self.num_cov_tracks>0:
-            gs1.update(hspace=gs1hs)
+            cov_hr = height_ratio_cov2tx*self.num_cov_tracks
+            tx_hr = len(self.txs)
+            gs_sub = gs.subgridspec(2, 1, height_ratios=[cov_hr,tx_hr])
+            gs_sub_cov = gs_sub[0].subgridspec(self.num_cov_tracks,1,hspace=1)
+            gs_sub_tx = gs_sub[1].subgridspec(len(self.txs),1)
+        else:
+            gs_sub_tx = gs.subgridspec(len(self.txs), 1,hspace=0.4)
+            
+        return gs_sub_cov,gs_sub_tx
+    
+    def plot_coverage(self,fig,gs,title,compare,text_attr,rel):
+        color_dens = "#ffb703"
+        color_spines = "#fb8500"
+        axes = []
 
         for c in range(self.num_cov_tracks):
 
             final_plot = c==self.num_cov_tracks-1
-            ax = plt.subplot(gs1[c,:])
+            ax = fig.add_subplot(gs[c,:])
+            axes.append(ax)
 
             if c==0 and not title is None:
                 ax.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
@@ -590,20 +601,35 @@ class Locus:
 
             ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c])+h)
             ax.yaxis.set_ticks_position('left')
-            ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])
-
+            if len(self.track_names)>0:
+                ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])
+                
+        return axes
+    
+    def plot_txs(self,fig,gs,title,compare,text_attr,rel):
+        color_dens = "#ffb703"
+        color_spines = "#fb8500"
+        colors_compare = {-1:("#029e73","Missing From Reference"),
+                          1:("#949494","Extra In Reference"),
+                          100:("#56b4e9","Matching In Frame"),
+                          -100:("#d55e00","Matching Out Of Frame"),
+                          0:("#023047","Non-Coding Positions")}
+        colors_non_compare = {100:("#56b4e9","Coding Positions"),
+                              0:("#023047","Non-Coding Positions")}
+        
+        axes = []
+        
         exonwidth = .3
         narrows = 50
 
         locus_start = self.get_start()
 
-        # gs2 = GridSpec(len(self.txs)+self.num_cov_tracks, 1,height_ratios=hrs)
-        gs1.update(hspace=gs2hs)
         for i,tx in enumerate(self.txs):
             if tx.dummy: # skip any dummies
                 continue
 
-            ax2 = plt.subplot(gs1[i+self.num_cov_tracks,:])
+            ax2 = fig.add_subplot(gs[i,:])
+            axes.append(ax2)
 
             if i==0 and not title is None and self.num_cov_tracks==0:
                 ax2.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
@@ -674,12 +700,113 @@ class Locus:
             ax2.set_xticks([])
             ax2.set_yticks([])
 
+                
+        return axes
+    
+    def build_zoom(self,fig,axes_norm,axes_zoom):
+        # first need coordinates for the zoom region
+        zoom_start_transform = self.graphcoords[self.settings["zoom_start"]-self.get_start()]
+        zoom_end_transform = self.graphcoords[self.settings["zoom_end"]-self.get_start()]
+        
+        num_tracks = len(self.txs)+self.num_cov_tracks
+        
+        scaled_start_zoom = self.scale_val(zoom_start_transform,
+                                      axes_norm[0].get_position().get_points()[0][0],
+                                      axes_norm[0].get_position().get_points()[1][0],
+                                      axes_norm[0].get_xlim()[0],
+                                      axes_norm[0].get_xlim()[1])
+        scaled_end_zoom = self.scale_val(zoom_end_transform,
+                                      axes_norm[0].get_position().get_points()[0][0],
+                                      axes_norm[0].get_position().get_points()[1][0],
+                                      axes_norm[0].get_xlim()[0],
+                                      axes_norm[0].get_xlim()[1])
+        
+        scaled_start_01 = self.scale_val(zoom_start_transform,
+                                      0,
+                                      1,
+                                      axes_norm[0].get_xlim()[0],
+                                      axes_norm[0].get_xlim()[1])
+        scaled_end_01 = self.scale_val(zoom_end_transform,
+                                      0,
+                                      1,
+                                      axes_norm[0].get_xlim()[0],
+                                      axes_norm[0].get_xlim()[1])
+        
+        
+        top_gs = GridSpec(2, 1, figure=fig)
+        top_gs.update(top=axes_norm[0].get_position().get_points()[1][1],
+                        bottom=axes_norm[-1].get_position().get_points()[0][1],
+                        left=scaled_start_zoom,
+                        right=scaled_end_zoom)
+        top_ax = fig.add_subplot(top_gs[0:])
+        top_ax.tick_params(axis='both',which='both',bottom=0,left=0, labelbottom=0, labelleft=0)
+        top_ax.set_facecolor("grey")
+        top_ax.patch.set_alpha(0.1)
+        
+        mid_gs = GridSpec(2, 1, figure=fig)
+        mid_gs.update(top=axes_norm[-1].get_position().get_points()[0][1],
+                        bottom=axes_zoom[0].get_position().get_points()[1][1],
+                        left=axes_norm[0].get_position().get_points()[0][0],
+                        right=axes_norm[0].get_position().get_points()[1][0])
+        mid_ax = fig.add_subplot(mid_gs[0:])
+        mid_ax.tick_params(axis='both',which='both',bottom=0,left=0,labelbottom=0,labelleft=0)
+        p = plt.Polygon([[scaled_start_01,1],[0,0],[1,0],[scaled_end_01,1]],closed=True,color="grey",alpha=0.1)
+        mid_ax.add_patch(p)
+        mid_ax.set_axis_off()
 
-        # if not title is None:
-            # plt.suptitle(title,wrap=True,fontsize=self.settings["font_size"]*1.25)
+        bot_gs = GridSpec(2, 1, figure=fig)
+        bot_gs.update(top=axes_zoom[0].get_position().get_points()[1][1],
+                        bottom=axes_zoom[-1].get_position().get_points()[0][1],
+                        left=axes_norm[0].get_position().get_points()[0][0],
+                        right=axes_norm[0].get_position().get_points()[1][0])
+        bot_ax = fig.add_subplot(bot_gs[0:])
+        bot_ax.tick_params(axis='both',which='both',bottom=0,left=0,labelbottom=0,labelleft=0)
+        bot_ax.set_facecolor("grey")
+        bot_ax.patch.set_alpha(0.1)
+        
+        
+        
+    def build_fig(self,out_fname,title,save_pickle,compare,legend,text_attr,rel):
+        assert self.num_sj_tracks==self.num_cov_tracks or self.num_sj_tracks==0,"incompatible number of splice junciton and coverage tracks - the numebrs should either be the same or no splice junction tracks provided at all"
+        
+        fig_height = (self.settings["tx_height"]*len(self.txs)) + (self.settings["cov_height"]*self.num_cov_tracks)
+        if self.settings["zoom"]:
+            fig_height *= 1.75
+            
+        fig = plt.figure(figsize=(self.settings["fig_width"],fig_height))
+        
+        gs_main = self.build_gridspace(fig)
+        gs_subs = []
+        
+        for nr in range(gs_main.nrows):
+            gs_sub_cov,gs_sub_tx = self.build_cov_tx_grid(fig,gs_main[nr])
+            gs_subs.append([(gs_sub_cov,gs_sub_tx),[]])
+            
+            # add data
+            axes = self.plot_coverage(fig,gs_sub_cov,title,compare,text_attr,rel)
+            gs_subs[-1][1].extend(axes)
+            axes = self.plot_txs(fig,gs_sub_tx,title,compare,text_attr,rel)
+            gs_subs[-1][1].extend(axes)
+            
+            if nr==1:
+                # remove axis labels, etc
+                for ax in gs_subs[-1][1]:
+                    ax.set_xlabel("")
+                    ax.set_title("")
+                    zoom_start_transform = self.graphcoords[self.settings["zoom_start"]-self.get_start()]
+                    zoom_end_transform = self.graphcoords[self.settings["zoom_end"]-self.get_start()]
+                    ax.set_xlim(zoom_start_transform,zoom_end_transform)
+                    
+            
+        if self.settings["zoom"]:
+            self.build_zoom(fig,gs_subs[0][1],gs_subs[1][1])
+            
+        return fig
+            
 
-        plt.subplots_adjust(hspace=.5, wspace=.7)
-
+    def plot(self,out_fname,title,save_pickle,compare,legend,text_attr,rel):                              
+        fig = self.build_fig(out_fname,title,save_pickle,compare,legend,text_attr,rel)
+        
         if legend:
             handles = [Patch(color=c[0],label=c[1]) for i,c in colors_non_compare.items()]
             if compare:
@@ -761,7 +888,10 @@ def sashimi(args):
                 "title": args.title,
                 "pickle": args.pickle,
                 "compare": args.compare,
-                "all_junctions": args.all_junctions}
+                "all_junctions": args.all_junctions,
+                "zoom_start":args.zoom_start,
+                "zoom_end":args.zoom_end,
+                "zoom":args.zoom_start is not None and args.zoom_end is not None}
 
     tids_seen = set()
 
@@ -949,6 +1079,14 @@ def main(args):
                         type=int,
                         default=4,
                         help="Number of positional markers to include on the x-axis with labels (Default: 4).")
+    parser.add_argument("--zoom_start",
+                        required=False,
+                        type=int,
+                        help="Start coordinate to show in the zoomed-in view")
+    parser.add_argument("--zoom_end",
+                        required=False,
+                        type=int,
+                        help="End coordinate to show in the zoomed-in view")
     parser.add_argument("--number_junctions",
                         action="store_false",
                         required=False,

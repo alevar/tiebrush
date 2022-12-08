@@ -16,6 +16,26 @@ from adjustText import adjust_text
 
 mpl.use('Agg')
 
+def cut(chain,s,e):
+    dup = [c for c in chain]
+    if s<=dup[0][0] and e>=dup[-1][1]: # nothing to cut
+        return dup
+        
+    tmp = list()
+    for i,c in enumerate(dup): # not reference - the copy is being modified
+        if c[0]<=s and c[1]>=s:
+            dup[i][0]=s
+            c[0]=s
+        if c[1]>=e:
+            dup[i][1]=e
+            c[1]=e
+        if c[1]<s or c[0]>e:
+            continue
+            
+        tmp.append(c)
+        
+    return tmp
+
 def intersect(s1,s2):
     res = [0,-1,0]
     tis = max(s1[0],s2[0])
@@ -197,9 +217,9 @@ class TX:
                 continue
 
             if lcs[2].lower() == "exon":
-                self.exons.append((int(lcs[3]), int(lcs[4])))
+                self.exons.append([int(lcs[3]), int(lcs[4])])
             if self.store_cds and lcs[2].lower() == "cds":
-                self.orf.append((int(lcs[3]), int(lcs[4])))
+                self.orf.append([int(lcs[3]), int(lcs[4])])
 
         # sort exons and orf
         self.exons.sort(key=lambda l: l[0])
@@ -275,15 +295,35 @@ class Locus:
 
         self.graphcoords = None
         self.graphToGene = None
+        
         self.covx_lst = list()
         self.cov_lst = list()
-
         self.cov_full_lst = list()
+        
+        # these contain values for the zoomed-in view if requested
+        self.covx_zoom_lst = list()
+        self.cov_zoom_lst = list()
+        self.cov_full_zoom_lst = list()
 
         self.settings = None
 
         self.num_cov_tracks = 0
         self.num_sj_tracks = 0
+        
+        self.zoom_ratio = 1
+        
+        self.color_dens = "#ffb703"
+        self.color_spines = "#fb8500"
+        self.colors_compare = {-1:("#029e73","Missing From Reference"),
+                          1:("#949494","Extra In Reference"),
+                          100:("#56b4e9","Matching In Frame"),
+                          -100:("#d55e00","Matching Out Of Frame"),
+                          0:("#023047","Non-Coding Positions")}
+        self.colors_exon_compare = {-1:("#029e73","Missing From Reference"),
+                          1:("#949494","Extra In Reference"),
+                          100:("#023047","Matching")}
+        self.colors_non_compare = {100:("#56b4e9","Coding Positions"),
+                              0:("#023047","Non-Coding Positions")}
 
     @staticmethod
     def union(intervals):
@@ -294,7 +334,7 @@ class Locus:
             else:
                 res.append([s, e])
 
-        return [(x[0], x[1]) for x in res]
+        return [[x[0], x[1]] for x in res]
 
     @staticmethod
     def cubic_bezier(pts, t):
@@ -338,6 +378,12 @@ class Locus:
         if self.graphcoords is None:
             self.graphcoords, self.graphToGene = self.getScaling(self.settings["intron_scale"], self.settings["exon_scale"],
                                                                  self.settings["reverse"])
+                                                                 
+        # get ratios
+        if self.settings["zoom"]:
+            zoom_start_transform = self.settings["zoom_start"]-self.get_start()
+            zoom_end_transform = self.settings["zoom_end"]-self.get_start()
+            self.zoom_ratio = 1 if not self.settings["zoom"] else (zoom_end_transform-zoom_start_transform)/(self.get_end()-self.get_start())
 
     def get_start(self):
         return self.intervals[0][0]
@@ -430,14 +476,14 @@ class Locus:
     def set_settings(self, settings):
         self.settings = settings
 
-    def compress_intervals(self, vals, graphcoords):  # intervals with optional values if more
+    def compress_intervals(self, vals, graphcoords,resolution):  # intervals with optional values if more
         compressed_x = []
         compressed_wiggle = []
         prevx = graphcoords[0]
         tmpval = []
         for i in range(len(graphcoords)):
             tmpval.append(vals[i])
-            if abs(graphcoords[i] - prevx) > self.settings["resolution"]:
+            if abs(graphcoords[i] - prevx) > resolution:
                 compressed_wiggle.append(np.mean(tmpval))
                 compressed_x.append(prevx)
                 prevx = graphcoords[i]
@@ -472,8 +518,17 @@ class Locus:
                     self.cov_full_lst[-1][v - self.get_start()] = int(lcs[3])
 
         # compress the vals
-        self.covx_lst[-1], self.cov_lst[-1] = self.compress_intervals(self.cov_full_lst[-1], self.graphcoords)
+        self.covx_lst[-1], self.cov_lst[-1] = self.compress_intervals(self.cov_full_lst[-1], self.graphcoords,self.settings["resolution"])
         self.num_cov_tracks+=1
+               
+        if self.settings["zoom"]:            
+            self.covx_zoom_lst.append(list())
+            self.cov_zoom_lst.append(list())
+            
+            zoom_resolution = max(1,int(self.settings["resolution"]*self.zoom_ratio))
+            
+            self.covx_zoom_lst[-1],self.cov_zoom_lst[-1] = self.compress_intervals(self.cov_full_lst[-1], self.graphcoords,zoom_resolution)
+            
 
     def get_coords_str(self):
         return self.seqid + self.strand + ":" + str(self.get_start()) + "-" + str(self.get_end())
@@ -490,16 +545,19 @@ class Locus:
     def build_gridspace(self,fig):
         gs_main = None
         if self.settings["zoom"]:
-            gs_main = GridSpec(2, 1, figure=fig, height_ratios=[3,1], hspace=0.25)
+            gs_main = GridSpec(2, 1, figure=fig, height_ratios=[2,1], hspace=0.2)
         else:
             gs_main = GridSpec(1, 1, figure=fig)
         
         return gs_main
         
-    def build_cov_tx_grid(self,fig,gs):
+    def build_cov_tx_grid(self,fig,gs,zoom_view):
         height_ratio_cov2tx = 0
         try:
-            height_ratio_cov2tx = self.settings["cov_height"]/self.settings["tx_height"]
+            if zoom_view:
+                height_ratio_cov2tx = (self.settings["cov_height"])/self.settings["tx_height"]
+            else:
+                height_ratio_cov2tx = self.settings["cov_height"]/self.settings["tx_height"]
         except:
             pass
         
@@ -509,20 +567,24 @@ class Locus:
         if self.num_cov_tracks>0:
             cov_hr = height_ratio_cov2tx*self.num_cov_tracks
             tx_hr = len(self.txs)
-            gs_sub = gs.subgridspec(2, 1, height_ratios=[cov_hr,tx_hr])
+            gs_sub = gs.subgridspec(2, 1, height_ratios=[cov_hr,tx_hr],hspace=0.2)
             gs_sub_cov = gs_sub[0].subgridspec(self.num_cov_tracks,1,hspace=1)
-            gs_sub_tx = gs_sub[1].subgridspec(len(self.txs),1)
+            gs_sub_tx = gs_sub[1].subgridspec(len(self.txs),1,hspace=0.4)
         else:
             gs_sub_tx = gs.subgridspec(len(self.txs), 1,hspace=0.4)
             
         return gs_sub_cov,gs_sub_tx
     
-    def plot_coverage(self,fig,gs,title,compare,text_attr,rel):
-        color_dens = "#ffb703"
-        color_spines = "#fb8500"
+    def plot_coverage(self,fig,gs,title,compare,text_attr,rel,zoom_view):    
         axes = []
 
         for c in range(self.num_cov_tracks):
+            covx = self.covx_lst[c]
+            cov = self.cov_lst[c]
+            if zoom_view:
+                covx = self.covx_zoom_lst[c]
+                cov = self.cov_zoom_lst[c]
+                
 
             final_plot = c==self.num_cov_tracks-1
             ax = fig.add_subplot(gs[c,:])
@@ -531,9 +593,12 @@ class Locus:
             if c==0 and not title is None:
                 ax.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
 
-            ax.fill_between(self.covx_lst[c], self.cov_lst[c],y2=0, color=color_dens, lw=0)
+            if not zoom_view:
+                ax.fill_between(covx,cov,y2=0, color=self.color_dens, lw=0)
+            else:
+                ax.fill_between(covx,cov,y2=0, color=self.color_dens, lw=0,step="post")
 
-            maxheight = max(self.cov_lst[c])
+            maxheight = max(cov)
 
             ymax = 1.1 * maxheight
             ymin = -.5 * ymax
@@ -565,7 +630,7 @@ class Locus:
                         annotations.append(ax.annotate('%s'%(sj_v), xy=(midpt[0], midpt[1]), xytext=(midpt[0], midpt[1]+.3),fontsize=self.settings["font_size"]))
 
                     pp1 = PathPatch(Path(pts,[Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]),
-                                    ec=color_spines, lw=np.log(val[2] + 1) / np.log(10), fc='none')
+                                    ec=self.color_spines, lw=np.log(val[2] + 1) / np.log(10), fc='none')
 
                     ax.add_patch(pp1)
 
@@ -595,32 +660,26 @@ class Locus:
             h = -3 * ymin / 3
 
             ax.set_ylabel("Coverage",fontsize=self.settings["font_size"])
-            ax.spines["left"].set_bounds(0, max(self.cov_full_lst[c])+h)
+            ax.spines["left"].set_bounds(0, max(self.cov_full_lst[c]))
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
 
 
-            ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c])+h)
+            ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c]))
             ax.yaxis.set_ticks_position('left')
             if len(self.track_names)>0:
                 ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])
                 
         return axes
     
-    def plot_txs(self,fig,gs,title,compare,text_attr,rel):
-        color_dens = "#ffb703"
-        color_spines = "#fb8500"
-        colors_compare = {-1:("#029e73","Missing From Reference"),
-                          1:("#949494","Extra In Reference"),
-                          100:("#56b4e9","Matching In Frame"),
-                          -100:("#d55e00","Matching Out Of Frame"),
-                          0:("#023047","Non-Coding Positions")}
-        colors_non_compare = {100:("#56b4e9","Coding Positions"),
-                              0:("#023047","Non-Coding Positions")}
+    def plot_txs(self,fig,gs,title,compare,text_attr,rel,zoom_view):
         
         axes = []
         
         exonwidth = .3
         narrows = 50
+        if zoom_view:
+            narrows /= self.zoom_ratio
+            narrows = int(narrows)
 
         locus_start = self.get_start()
 
@@ -628,77 +687,85 @@ class Locus:
             if tx.dummy: # skip any dummies
                 continue
 
-            ax2 = fig.add_subplot(gs[i,:])
-            axes.append(ax2)
+            ax = fig.add_subplot(gs[i,:])
+            axes.append(ax)
 
             if i==0 and not title is None and self.num_cov_tracks==0:
-                ax2.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
+                ax.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
 
             xlabel = tx.get_tid()
             if text_attr != "transcript_id":
                 ta = tx.get_attr(text_attr)
                 if len(ta)>0:
-                    xlabel += " : "+tx.get_attr(text_attr)
+                    xlabel = tx.get_attr(text_attr)
 
-            ax2.set_xlabel(xlabel,fontsize=self.settings["font_size"])
+            ax.set_xlabel(xlabel,fontsize=self.settings["font_size"])
 
             if compare and self.ref_tx is not None:
                 stack = compare_label_frame(tx.orf,self.txs[self.ref_tx].orf,self.strand)
-
-                for s, e, l in stack:
+                for s, e, l in stack:                        
                     s = s - locus_start
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
                     if l==1:
-                        ax2.fill(x, y,linestyle="-",color=colors_compare[l][0],lw=2,zorder=30,fill=False)
+                        ax.fill(x, y,linestyle="-",color=self.colors_compare[l][0],lw=2,zorder=30,fill=False)
                     else:
-                        ax2.fill(x, y,color=colors_compare[l][0], lw=.5, zorder=30)
+                        ax.fill(x, y,color=self.colors_compare[l][0], lw=.5, zorder=30)
 
                 if self.ref_tx == i:
-                    x = [self.graphcoords[0], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[0]]
-                    y = [-exonwidth / 5, -exonwidth / 5, exonwidth / 5, exonwidth / 5]
-                    ax2.fill(x, y,linestyle="-",color="xkcd:salmon",alpha=0.15,lw=2,zorder=30,fill=True)
+                    ax.set_facecolor((1,0,0,0.1))
+                    #x = [self.graphcoords[0], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[0]]
+                    #y = [-exonwidth / 5, -exonwidth / 5, exonwidth / 5, exonwidth / 5]
+                    #ax.fill(x, y,linestyle="-",color="xkcd:salmon",alpha=0.15,lw=2,zorder=30,fill=True)
 
             else:
-                for s, e in tx.orf:
+                cur_orf = [o for o in tx.orf]
+                for s, e in cur_orf:
                     s = s - locus_start
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
-                    ax2.fill(x, y,color=colors_non_compare[100][0], lw=.5, zorder=30)
+                    ax.fill(x, y,color=self.colors_non_compare[100][0], lw=.5, zorder=30)
 
-            for s, e in tx.exons:
+            cur_exons = [e for e in tx.exons]  
+            for s, e in cur_exons:
                 s = s - locus_start
                 e = e - locus_start
                 x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                 y = [-exonwidth / 8, -exonwidth / 8, exonwidth / 8, exonwidth / 8]
-                ax2.fill(x, y, color=colors_non_compare[0][0], lw=.5, zorder=20)
+                ax.fill(x, y, color=self.colors_non_compare[0][0], lw=.5, zorder=20)
 
             # Draw intron.
             tx_start = tx.get_start() - locus_start
             tx_end = tx.get_end() - locus_start
+            max_val = max(self.graphcoords)
 
-            hline_left = self.graphcoords[tx_start]/max(self.graphcoords)
-            hline_right = self.graphcoords[tx_end]/max(self.graphcoords)
-            ax2.axhline(0,xmin=hline_left,xmax=hline_right, color=colors_non_compare[0][0], lw=2)
+            hline_left = self.graphcoords[tx_start]/max_val
+            hline_right = self.graphcoords[tx_end]/max_val
+            ax.axhline(0,xmin=hline_left,xmax=hline_right, color=self.colors_non_compare[0][0], lw=2)
 
             # Draw intron arrows.
-            spread = .2 * max(self.graphcoords) / narrows
+            spread = .2 * max_val / narrows
+                
             for im in range(narrows):
-                loc = float(im) * max(self.graphcoords) / narrows
+                loc = float(im) * max_val / narrows
                 if tx.get_strand() == '+' or self.settings["reverse"]:
                     x = [loc - spread, loc, loc - spread]
                 else:
                     x = [loc + spread, loc, loc + spread]
                 y = [-exonwidth / 20, 0, exonwidth / 20]
                 if x[0]>=self.graphcoords[tx_start] and x[0]<=self.graphcoords[tx_end]:
-                    ax2.plot(x, y, lw=2, color=colors_non_compare[0][0])
+                    ax.plot(x, y, lw=2, color=self.colors_non_compare[0][0])
 
-            ax2.set_xlim(0, max(self.graphcoords))
-            plt.box(on=False)
-            ax2.set_xticks([])
-            ax2.set_yticks([])
+            ax.set_xlim(0, max_val)
+            #plt.box(on=False)
+            ax.spines['right'].set_color('none')
+            ax.spines['top'].set_color('none')
+            ax.spines['bottom'].set_color('none')
+            ax.spines['left'].set_color('none')
+            ax.set_xticks([])
+            ax.set_yticks([])
 
                 
         return axes
@@ -779,13 +846,13 @@ class Locus:
         gs_subs = []
         
         for nr in range(gs_main.nrows):
-            gs_sub_cov,gs_sub_tx = self.build_cov_tx_grid(fig,gs_main[nr])
+            gs_sub_cov,gs_sub_tx = self.build_cov_tx_grid(fig,gs_main[nr],nr==1)
             gs_subs.append([(gs_sub_cov,gs_sub_tx),[]])
             
             # add data
-            axes = self.plot_coverage(fig,gs_sub_cov,title,compare,text_attr,rel)
+            axes = self.plot_coverage(fig,gs_sub_cov,title,compare,text_attr,rel,nr==1)
             gs_subs[-1][1].extend(axes)
-            axes = self.plot_txs(fig,gs_sub_tx,title,compare,text_attr,rel)
+            axes = self.plot_txs(fig,gs_sub_tx,title,compare,text_attr,rel,nr==1)
             gs_subs[-1][1].extend(axes)
             
             if nr==1:
@@ -808,10 +875,10 @@ class Locus:
         fig = self.build_fig(out_fname,title,save_pickle,compare,legend,text_attr,rel)
         
         if legend:
-            handles = [Patch(color=c[0],label=c[1]) for i,c in colors_non_compare.items()]
+            handles = [Patch(color=c[0],label=c[1]) for i,c in self.colors_non_compare.items()]
             if compare:
-                handles = [Patch(color=c[0],label=c[1]) for i,c in colors_compare.items()]
-                handles[1] = Patch(edgecolor=colors_compare[1][0],facecolor=None,fill=False,linestyle="-",linewidth=3,label=colors_compare[1][1])
+                handles = [Patch(color=c[0],label=c[1]) for i,c in self.colors_compare.items()]
+                handles[1] = Patch(edgecolor=self.colors_compare[1][0],facecolor=None,fill=False,linestyle="-",linewidth=3,label=self.colors_compare[1][1])
 
             lgd = plt.legend(handles=handles,
                              fontsize=self.settings["font_size"],
@@ -1128,3 +1195,6 @@ def main(args):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+    
+
+# TODO: add transcript-level comparison

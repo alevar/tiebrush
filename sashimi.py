@@ -575,6 +575,32 @@ class Locus:
             
         return gs_sub_cov,gs_sub_tx
     
+    @staticmethod
+    def get_belly_arc_coords(start,end,leftdens,rightdens,h,thickness):
+        pts = [(start, leftdens),
+               (start, (leftdens+h)+thickness),
+               (end,   (rightdens+h)+thickness),
+               (end,   rightdens),
+               (end,   (rightdens+h)-thickness),
+               (start, (leftdens+h)-thickness),
+               (start, leftdens),
+               (start, leftdens)]
+        
+        codes = [Path.MOVETO,
+                 Path.CURVE4,
+                 Path.CURVE4,
+                 Path.CURVE4,
+                 Path.CURVE4,
+                 Path.CURVE4,
+                 Path.CURVE4,
+                 Path.CLOSEPOLY]
+        
+        midpt = Locus.cubic_bezier([(start, leftdens),
+                                    (start, leftdens+h),
+                                    (end,   rightdens+h),
+                                    (end,   rightdens)], .5)
+        return pts,codes,midpt
+    
     def plot_coverage(self,fig,gs,title,compare,text_attr,rel,zoom_view):    
         axes = []
 
@@ -617,20 +643,15 @@ class Locus:
 
                     leftdens = self.cov_full_lst[c][leftss - self.get_start()-1]
                     rightdens = self.cov_full_lst[c][rightss - self.get_start()]
-
-                    pts = [(ss1, leftdens),
-                           (ss1, leftdens + h),
-                           (ss2, rightdens + h),
-                           (ss2, rightdens)]
-
-                    midpt = Locus.cubic_bezier(pts, .5)
+                    
+                    thickness = np.log(val[2] + 1) / np.log(10)
+                    pts,codes,midpt = self.get_belly_arc_coords(ss1,ss2,leftdens,rightdens,h,thickness)
 
                     if self.settings["number_junctions"]:
                         sj_v = val[1] if rel else val[0]
                         annotations.append(ax.annotate('%s'%(sj_v), xy=(midpt[0], midpt[1]), xytext=(midpt[0], midpt[1]+.3),fontsize=self.settings["font_size"]))
 
-                    pp1 = PathPatch(Path(pts,[Path.MOVETO, Path.CURVE4, Path.CURVE4, Path.CURVE4]),
-                                    ec=self.color_spines, lw=np.log(val[2] + 1) / np.log(10), fc='none')
+                    pp1 = PathPatch(Path(pts,codes),ec=self.color_spines, fc=self.color_spines,alpha=0.75,lw=2/3)
 
                     ax.add_patch(pp1)
 
@@ -708,10 +729,10 @@ class Locus:
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
-                    if l==1:
-                        ax.fill(x, y,linestyle="-",color=self.colors_compare[l][0],lw=2,zorder=30,fill=False)
-                    else:
-                        ax.fill(x, y,color=self.colors_compare[l][0], lw=.5, zorder=30)
+                    
+                    ax.fill(x, y,linestyle="-",color=self.colors_compare[l][0],lw=2,zorder=30,fill=False)
+                    if not l==1:
+                        ax.fill(x, y,color=self.colors_compare[l][0], zorder=30)
 
                 if self.ref_tx == i:
                     ax.set_facecolor((1,0,0,0.1))
@@ -726,6 +747,7 @@ class Locus:
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
+                    ax.fill(x, y,linestyle="-",color=self.colors_non_compare[100][0],lw=2,zorder=30,fill=False)
                     ax.fill(x, y,color=self.colors_non_compare[100][0], lw=.5, zorder=30)
 
             cur_exons = [e for e in tx.exons]  

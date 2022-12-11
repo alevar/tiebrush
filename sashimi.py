@@ -905,7 +905,7 @@ class Locus:
             lgd = plt.legend(handles=handles,
                              fontsize=self.settings["font_size"],
                              loc="lower left",
-                             bbox_to_anchor=(0., -2.02, 1., .102),
+                             bbox_to_anchor=(0., -0.4, 1., .102),
                              ncol=2,
                              mode="expand",
                              borderaxespad=0.)

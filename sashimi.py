@@ -434,9 +434,9 @@ class Locus:
             pass
         for k,v in self.intron_cov_lst[-1].items():
             self.intron_cov_lst[-1][k].append(round(self.intron_cov_lst[-1][k][0]/factor,2))
-            top = self.intron_cov_lst[-1][k][0]
+            top = 99*self.intron_cov_lst[-1][k][0]
             bottom = max(0.1,max_sj_cov)
-            self.intron_cov_lst[-1][k].append((top/bottom)*100000)
+            self.intron_cov_lst[-1][k].append((top/bottom)+1)
 
         self.num_sj_tracks+=1
 
@@ -624,12 +624,9 @@ class Locus:
             else:
                 ax.fill_between(covx,cov,y2=0, color=self.color_dens, lw=0,step="post")
 
-            maxheight = max(cov)
-
-            ymax = 1.1 * maxheight
-            ymin = -.5 * ymax
-
             annotations = []
+            
+            y_limits = [0,max(self.cov_full_lst[c])]
 
             if self.num_sj_tracks>0:
                 for jxn,val in self.intron_cov_lst[c].items():
@@ -638,13 +635,15 @@ class Locus:
                     ss1, ss2 = [self.graphcoords[leftss - self.get_start() - 1],
                                 self.graphcoords[rightss - self.get_start()]]
 
-                    mid = (ss1 + ss2) / 2
-                    h = -3 * ymin / 4
-
                     leftdens = self.cov_full_lst[c][leftss - self.get_start()-1]
                     rightdens = self.cov_full_lst[c][rightss - self.get_start()]
+                    maxdens = max(leftdens,rightdens)
                     
-                    thickness = np.log(val[2] + 1) / np.log(10)
+                    h = maxdens*1.2
+                    
+                    thickness = min(max(self.cov_full_lst[c])*0.2,val[0]*0.2)
+                    y_limits[1] = max(y_limits[1],h+(thickness/2))
+                    
                     pts,codes,midpt = self.get_belly_arc_coords(ss1,ss2,leftdens,rightdens,h,thickness)
 
                     if self.settings["number_junctions"]:
@@ -653,7 +652,7 @@ class Locus:
 
                     pp1 = PathPatch(Path(pts,codes),ec=self.color_spines, fc=self.color_spines,alpha=0.75,lw=2/3)
 
-                    ax.add_patch(pp1)
+                    ax.add_patch(pp1) 
 
                 adjust_text(annotations, autoalign='y', expand_objects=(0.1, 1),
                             only_move={'points':'', 'text':'y', 'objects':'y'}, force_text=0.75, force_objects=0.1)
@@ -678,14 +677,12 @@ class Locus:
                               fontsize=coords_fontsize)
 
 
-            h = -3 * ymin / 3
-
             ax.set_ylabel("Coverage",fontsize=self.settings["font_size"])
             ax.spines["left"].set_bounds(0, max(self.cov_full_lst[c]))
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
 
 
-            ax.set_ybound(lower=ax.get_ybound()[0], upper=max(self.cov_full_lst[c]))
+            ax.set_ybound(lower=y_limits[0], upper=y_limits[1])
             ax.yaxis.set_ticks_position('left')
             if len(self.track_names)>0:
                 ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])

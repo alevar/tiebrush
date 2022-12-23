@@ -627,6 +627,9 @@ class Locus:
             annotations = []
             
             y_limits = [0,max(self.cov_full_lst[c])]
+            
+            min_height = 0.25*max(self.cov_full_lst[c])
+            max_height = 0.4*max(self.cov_full_lst[c])
 
             if self.num_sj_tracks>0:
                 for jxn,val in self.intron_cov_lst[c].items():
@@ -639,10 +642,15 @@ class Locus:
                     rightdens = self.cov_full_lst[c][rightss - self.get_start()]
                     maxdens = max(leftdens,rightdens)
                     
-                    h = maxdens*1.2
+                    h = min(maxdens*0.75,max_height)
+                    h = max(h,min_height)
                     
-                    thickness = min(max(self.cov_full_lst[c])*0.2,val[0]*0.2)
-                    y_limits[1] = max(y_limits[1],h+(thickness/2))
+                    # for the super small values - we need to make the height higher
+                    # for super tall values - need smaller
+                    # else standardized
+                    
+                    thickness = min(max(self.cov_full_lst[c])*0.1,val[0]*0.1)
+                    y_limits[1] = max(y_limits[1],maxdens+h+(thickness/2))
                     
                     pts,codes,midpt = self.get_belly_arc_coords(ss1,ss2,leftdens,rightdens,h,thickness)
 
@@ -682,6 +690,7 @@ class Locus:
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
 
 
+            ax.set_ylim(y_limits[0],y_limits[1])
             ax.set_ybound(lower=y_limits[0], upper=y_limits[1])
             ax.yaxis.set_ticks_position('left')
             if len(self.track_names)>0:

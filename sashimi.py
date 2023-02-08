@@ -7,14 +7,13 @@ import sys
 import os
 
 import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.path import Path
 from matplotlib.patches import Patch
 from matplotlib.patches import PathPatch
 from matplotlib.gridspec import GridSpec
 from adjustText import adjust_text
-
-mpl.use('Agg')
 
 def cut(chain,s,e):
     dup = [c for c in chain]
@@ -455,7 +454,7 @@ class Locus:
         graphToGene = {}
         graphcoords = np.zeros((tx_end - tx_start + 1), dtype='f')
         x = 0
-        if self.strand == '+' or not reverse_minus:
+        if self.strand == '+' or reverse_minus:
             for i in range(tx_end - tx_start + 1):
                 graphcoords[i] = x
                 graphToGene[int(x)] = i + tx_start
@@ -778,6 +777,7 @@ class Locus:
                 
             for im in range(narrows):
                 loc = float(im) * max_val / narrows
+                x = []
                 if tx.get_strand() == '+' or self.settings["reverse"]:
                     x = [loc - spread, loc, loc - spread]
                 else:

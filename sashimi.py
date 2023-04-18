@@ -162,6 +162,8 @@ class TX:
         self.store_cds = True
 
         self.attrs = dict()
+        
+        self.group_id = None
 
     def clear(self):
         self.seqid = None
@@ -174,6 +176,8 @@ class TX:
         self.store_cds = True
 
         self.attrs = dict()
+        
+        self.group_id = None
 
     def set_nocds(self):
         self.store_cds = False
@@ -189,6 +193,9 @@ class TX:
         self.tid = tid
     def set_dummy(self,dummy):
         self.dummy=dummy
+    def set_group(gid:int):
+        assert gid<10,"group id can not exceed 9"
+        self.group_id = gid
 
     def parse_from_gtf(self, gtf_lines):
         for line in gtf_lines.split("\n"):
@@ -280,6 +287,7 @@ class TX:
 class Locus:
     def __init__(self):
         self.txs = list()
+        self.groups = list() # icontains group assignments for transcripts
         self.ref_tx = None
         self.seqid = None
         self.strand = None
@@ -311,6 +319,18 @@ class Locus:
         
         self.zoom_ratio = 1
         
+        self.group_colors = [[0.00392156862745098, 0.45098039215686275, 0.6980392156862745, 0.1],
+                             [0.8705882352941177, 0.5607843137254902, 0.0196078431372549, 0.1],
+                             [0.00784313725490196, 0.6196078431372549, 0.45098039215686275, 0.1],
+                             [0.8352941176470589, 0.3686274509803922, 0.0, 0.1],
+                             [0.8, 0.47058823529411764, 0.7372549019607844, 0.1],
+                             [0.792156862745098, 0.5686274509803921, 0.3803921568627451, 0.1],
+                             [0.984313725490196, 0.6862745098039216, 0.8941176470588236, 0.1],
+                             [0.5803921568627451, 0.5803921568627451, 0.5803921568627451, 0.1],
+                             [0.9254901960784314, 0.8823529411764706, 0.2, 0.1],
+                             [0.33725490196078434, 0.7058823529411765, 0.9137254901960784, 0.1]]
+
+
         self.color_dens = "#ffb703"
         self.color_spines = "#fb8500"
         self.colors_compare = {-1:("#029e73","Missing From Reference"),
@@ -348,7 +368,7 @@ class Locus:
         return p0 * (1 - t) ** 3 + 3 * t * p1 * (1 - t) ** 2 + \
                3 * t ** 2 * (1 - t) * p2 + t ** 3 * p3
 
-    def add_tx(self, tx, ref=False):
+    def add_tx(self, tx, ref:bool=False,group:int=0):
         assert self.seqid is None or self.seqid == tx.get_seqid(), "mismatching seqids: "+tx.get_tid()
         assert self.strand is None or self.strand == tx.get_strand(), "mismatching strands: "+tx.get_tid()
 
@@ -368,6 +388,7 @@ class Locus:
             intron[0] = e
 
         self.txs.append(tx)
+        self.groups.append(group)
 
         if ref:
             self.ref_tx = len(self.txs)-1
@@ -427,17 +448,22 @@ class Locus:
                     min_sj_cov = min(min_sj_cov,int(lcs[4]))
 
         factor = 0.00001
+        max_norm_val = 0
         try:
-            factor = total_sj_cov/len(self.intron_cov_lst[-1])
+            factor = total_sj_cov/len(self.intron_cov_lst[-1]) # total spliced reads / number of junctions
         except:
             pass
         for k,v in self.intron_cov_lst[-1].items():
-            self.intron_cov_lst[-1][k].append(round(self.intron_cov_lst[-1][k][0]/factor,2))
-            top = 99*self.intron_cov_lst[-1][k][0]
-            bottom = max(0.1,max_sj_cov)
-            self.intron_cov_lst[-1][k].append((top/bottom)+1)
+            norm_val = round(self.intron_cov_lst[-1][k][0]/factor,2)
+            max_norm_val = max(max_norm_val,norm_val)
+            self.intron_cov_lst[-1][k].append(norm_val) # this value is coverave divided by the factor (average junction usage)
+            top = 99*self.intron_cov_lst[-1][k][1]
+            bottom = max(0.1,max_norm_val)
+            self.intron_cov_lst[-1][k].append(round((top/bottom)+1)) # this value is simply normalized from 0.1 to 99
 
         self.num_sj_tracks+=1
+        
+        # rel - indicates how much more or less a junction is used relative to the average
 
     def getScaling(self, intron_scale, exon_scale, reverse_minus):
         """
@@ -454,7 +480,7 @@ class Locus:
         graphToGene = {}
         graphcoords = np.zeros((tx_end - tx_start + 1), dtype='f')
         x = 0
-        if self.strand == '+' or reverse_minus:
+        if self.strand == '+' or not reverse_minus:
             for i in range(tx_end - tx_start + 1):
                 graphcoords[i] = x
                 graphToGene[int(x)] = i + tx_start
@@ -654,7 +680,7 @@ class Locus:
                     pts,codes,midpt = self.get_belly_arc_coords(ss1,ss2,leftdens,rightdens,h,thickness)
 
                     if self.settings["number_junctions"]:
-                        sj_v = val[1] if rel else val[0]
+                        sj_v = val[2] if rel else val[0]
                         annotations.append(ax.annotate('%s'%(sj_v), xy=(midpt[0], midpt[1]), xytext=(midpt[0], midpt[1]+.3),fontsize=self.settings["font_size"]))
 
                     pp1 = PathPatch(Path(pts,codes),ec=self.color_spines, fc=self.color_spines,alpha=0.75,lw=2/3)
@@ -715,6 +741,7 @@ class Locus:
 
             ax = fig.add_subplot(gs[i,:])
             axes.append(ax)
+            facecolor_set = False
 
             if i==0 and not title is None and self.num_cov_tracks==0:
                 ax.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
@@ -740,6 +767,7 @@ class Locus:
                         ax.fill(x, y,color=self.colors_compare[l][0], zorder=30)
 
                 if self.ref_tx == i:
+                    facecolor_set = True
                     ax.set_facecolor((1,0,0,0.1))
                     #x = [self.graphcoords[0], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[0]]
                     #y = [-exonwidth / 5, -exonwidth / 5, exonwidth / 5, exonwidth / 5]
@@ -777,7 +805,6 @@ class Locus:
                 
             for im in range(narrows):
                 loc = float(im) * max_val / narrows
-                x = []
                 if tx.get_strand() == '+' or self.settings["reverse"]:
                     x = [loc - spread, loc, loc - spread]
                 else:
@@ -794,6 +821,9 @@ class Locus:
             ax.spines['left'].set_color('none')
             ax.set_xticks([])
             ax.set_yticks([])
+            
+            if not facecolor_set:
+                ax.set_facecolor(self.group_colors[self.groups[i]])
 
                 
         return axes
@@ -988,6 +1018,27 @@ def sashimi(args):
                 "zoom_end":args.zoom_end,
                 "zoom":args.zoom_start is not None and args.zoom_end is not None}
 
+    # read in only values for which the transcriptome has been constructed
+    is_gtf_lst_file = True
+    gtf_lst = []
+    # check if it's a file listing a set of files with introns
+    with open(args.gtf,"r") as inFP:
+        for line in inFP:
+            tmp = line.strip()
+            if not os.path.exists(tmp) and len(tmp)>0:
+                is_gtf_lst_file = False
+                break
+
+    if is_gtf_lst_file:
+        with open(args.gtf,"r") as inFP:
+            for line in inFP:
+                tmp = line.strip()
+                if len(tmp)>0:
+                    gtf_lst.append(tmp)
+    else:
+        gtf_lst.append(args.gtf)
+
+
     tids_seen = set()
 
     locus = Locus()
@@ -995,43 +1046,44 @@ def sashimi(args):
 
     found_ref = False
 
-    with open(args.gtf, "r") as inFP:
-        cur_tid = None
-        cur_tid_lines = ""
-        for line in inFP:
-            lcs = line.split("\t")
-            if not len(lcs) == 9:
-                continue
-
-            tid = lcs[8].split("transcript_id \"", 1)[1].split("\"", 1)[0]
-            if cur_tid is None:
-                cur_tid = tid
-                cur_tid_lines = ""
-
-            if not cur_tid == tid:
-                assert tid not in tids_seen, "mixed tids"
-                tx = TX()
-                if args.nocds:
-                    tx.set_nocds()
-                tx.parse_from_gtf(cur_tid_lines)
-
-                is_ref = args.compare is not None and tx.get_tid()==args.compare
-                found_ref = found_ref or is_ref
-                locus.add_tx(tx,is_ref)
-
-                cur_tid = tid
-                cur_tid_lines = line
-
-            else:
-                cur_tid_lines += line
-
-        tx = TX()
-        if args.nocds:
-            tx.set_nocds()
-        tx.parse_from_gtf(cur_tid_lines)
-        is_ref = args.compare is not None and tx.get_tid()==args.compare
-        found_ref = found_ref or is_ref
-        locus.add_tx(tx,is_ref)
+    for grp,gtf in enumerate(gtf_lst):
+        with open(gtf, "r") as inFP:
+            cur_tid = None
+            cur_tid_lines = ""
+            for line in inFP:
+                lcs = line.split("\t")
+                if not len(lcs) == 9:
+                    continue
+    
+                tid = lcs[8].split("transcript_id \"", 1)[1].split("\"", 1)[0]
+                if cur_tid is None:
+                    cur_tid = tid
+                    cur_tid_lines = ""
+    
+                if not cur_tid == tid:
+                    assert tid not in tids_seen, "mixed tids"
+                    tx = TX()
+                    if args.nocds:
+                        tx.set_nocds()
+                    tx.parse_from_gtf(cur_tid_lines)
+    
+                    is_ref = args.compare is not None and tx.get_tid()==args.compare and not found_ref # TODO: should only consider one reference - founds first - done - never flag another tx as referene
+                    found_ref = found_ref or is_ref
+                    locus.add_tx(tx,is_ref,grp)
+    
+                    cur_tid = tid
+                    cur_tid_lines = line
+    
+                else:
+                    cur_tid_lines += line
+    
+            tx = TX()
+            if args.nocds:
+                tx.set_nocds()
+            tx.parse_from_gtf(cur_tid_lines)
+            is_ref = args.compare is not None and tx.get_tid()==args.compare and not found_ref
+            found_ref = found_ref or is_ref
+            locus.add_tx(tx,is_ref,grp)
 
     # if requested - read junctions and create a dummy transcript spanning min to max junc/transcript values
     if args.all_junctions and args.sj is not None:
@@ -1108,7 +1160,7 @@ def main(args):
     parser.add_argument("--gtf",
                         required=True,
                         type=str,
-                        help="Annotation in a GFF/GTF format")
+                        help="Annotation in a GFF/GTF format or a file containing a list of filenames with annotations in GTF/GFF format. If a list is pecified each group of transcripts will be highlighted using a different color. Duplicates will not be discarded. At most 10 groups are permitted.")
     parser.add_argument("--cov",
                         required=False,
                         type=str,

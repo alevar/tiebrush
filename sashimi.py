@@ -311,6 +311,13 @@ class Locus:
         self.covx_zoom_lst = list()
         self.cov_zoom_lst = list()
         self.cov_full_zoom_lst = list()
+        
+        self.subtract_coverage_idx = None
+        self.cov_full_lst_sub = list()
+        self.covx_lst_sub = list()
+        self.cov_lst_sub = list()
+        self.covx_zoom_lst_sub = list()
+        self.cov_zoom_lst_sub = list()
 
         self.settings = None
 
@@ -331,6 +338,9 @@ class Locus:
                              [0.33725490196078434, 0.7058823529411765, 0.9137254901960784, 0.1]]
 
 
+        self.color_sub_pos = "#bf212f"
+        self.color_sub_zero = "#006f3c"
+        self.color_sub_neg = "#264b96"
         self.color_dens = "#ffb703"
         self.color_spines = "#fb8500"
         self.colors_compare = {-1:("#029e73","Missing From Reference"),
@@ -418,6 +428,59 @@ class Locus:
                     self.track_names.append(line.strip())
         else:
             self.track_names.append(name_fname)
+            
+            
+    def norm_scale(self): # normalizes and scales coverage and junction data
+        for i,l in enumerate(self.cov_full_lst):
+            #compute total coverage over the plotted region in a give coverage track
+            total_cov = 0
+            
+            for c in l:
+                total_cov+=c
+                
+            factor = total_cov/(10**6)            
+            # create normalized values
+            self.cov_full_lst[i] = [c/factor for c in self.cov_full_lst[i]]
+            
+            # compress the vals
+            self.covx_lst[i], self.cov_lst[i] = self.compress_intervals(self.cov_full_lst[i], self.graphcoords,self.settings["resolution"])
+                   
+            if self.settings["zoom"]:            
+                zoom_resolution = max(1,int(self.settings["resolution"]*self.zoom_ratio))
+                
+                self.covx_zoom_lst[i],self.cov_zoom_lst[i] = self.compress_intervals(self.cov_full_lst[i], self.graphcoords,zoom_resolution)
+            
+            
+            
+            if len(self.intron_cov_lst)>0:
+                # now do the same to the junctions
+                for k,v in self.intron_cov_lst[i].items():
+                    self.intron_cov_lst[i][k][0] = round(self.intron_cov_lst[i][k][0]/factor,2)
+                
+    def subtract(self,cov_idx):
+        
+        assert cov_idx>=0 and cov_idx<len(self.cov_full_lst),"invalid coverage index fdor subtraction. Needs to be a value [0,"+len(self.cov_full_lst)+")"
+        
+        self.subtract_coverage_idx = cov_idx
+        self.cov_full_lst_sub = [list() for i in range(len(self.cov_full_lst))]
+        self.covx_lst_sub = [list() for i in range(len(self.cov_full_lst))]
+        self.cov_lst_sub = [list() for i in range(len(self.cov_full_lst))]
+        self.covx_zoom_lst_sub = [list() for i in range(len(self.cov_full_lst))]
+        self.cov_zoom_lst_sub = [list() for i in range(len(self.cov_full_lst))]
+        
+        for i1,l in enumerate(self.cov_full_lst):
+            if i1==cov_idx:
+                continue
+            for i2,c in enumerate(self.cov_full_lst[i1]):
+                self.cov_full_lst_sub[i1].append(c-self.cov_full_lst[cov_idx][i2])
+                
+            # compress the vals
+            self.covx_lst_sub[i1], self.cov_lst_sub[i1] = self.compress_intervals(self.cov_full_lst_sub[i1], self.graphcoords,self.settings["resolution"])
+                   
+            if self.settings["zoom"]:            
+                zoom_resolution = max(1,int(self.settings["resolution"]*self.zoom_ratio))
+                
+                self.covx_zoom_lst_sub[i1],self.cov_zoom_lst_sub[i1] = self.compress_intervals(self.cov_full_lst_sub[i1], self.graphcoords,zoom_resolution)
 
     def add_introns(self,sj_fname):
         assert os.path.exists(sj_fname),"Splice Junction track does not exist"
@@ -448,22 +511,18 @@ class Locus:
                     min_sj_cov = min(min_sj_cov,int(lcs[4]))
 
         factor = 0.00001
-        max_norm_val = 0
         try:
             factor = total_sj_cov/len(self.intron_cov_lst[-1]) # total spliced reads / number of junctions
         except:
             pass
         for k,v in self.intron_cov_lst[-1].items():
             norm_val = round(self.intron_cov_lst[-1][k][0]/factor,2)
-            max_norm_val = max(max_norm_val,norm_val)
-            self.intron_cov_lst[-1][k].append(norm_val) # this value is coverave divided by the factor (average junction usage)
-            top = 99*self.intron_cov_lst[-1][k][1]
-            bottom = max(0.1,max_norm_val)
-            self.intron_cov_lst[-1][k].append(round((top/bottom)+1)) # this value is simply normalized from 0.1 to 99
+            self.intron_cov_lst[-1][k].append(norm_val) # this value is coverage divided by the factor (average junction usage)
 
         self.num_sj_tracks+=1
         
         # rel - indicates how much more or less a junction is used relative to the average
+        # 100 is ...
 
     def getScaling(self, intron_scale, exon_scale, reverse_minus):
         """
@@ -593,7 +652,14 @@ class Locus:
             cov_hr = height_ratio_cov2tx*self.num_cov_tracks
             tx_hr = len(self.txs)
             gs_sub = gs.subgridspec(2, 1, height_ratios=[cov_hr,tx_hr],hspace=0.2)
-            gs_sub_cov = gs_sub[0].subgridspec(self.num_cov_tracks,1,hspace=1)
+            gs_sub_cov = gs_sub[0].subgridspec(self.num_cov_tracks,1,hspace=0.3)
+            # check if performing subtraction or adding any additional fields
+            #if self.settings["subtract"] is not None:
+                #for ci in range(self.num_cov_tracks):
+                    #if ci==self.settings["subtract"]:
+                        #continue
+                    #else:
+                        #gs_subtract = gs_sub_cov[ci].subgridspec(2,1,hspace=0.1)
             gs_sub_tx = gs_sub[1].subgridspec(len(self.txs),1,hspace=0.4)
         else:
             gs_sub_tx = gs.subgridspec(len(self.txs), 1,hspace=0.4)
@@ -630,31 +696,105 @@ class Locus:
         axes = []
 
         for c in range(self.num_cov_tracks):
+            y_limits = [min(0,min(self.cov_full_lst[c])),max(self.cov_full_lst[c])]
+            y_limits_sub = None
+            
+            min_height = 0.25*max(self.cov_full_lst[c])
+            max_height = 0.4*max(self.cov_full_lst[c])
+            
             covx = self.covx_lst[c]
             cov = self.cov_lst[c]
             if zoom_view:
                 covx = self.covx_zoom_lst[c]
                 cov = self.cov_zoom_lst[c]
                 
+                
+                
+            min_height_sub = None
+            max_height_sub = None
+            covx_sub = None
+            cov_sub = None
+            if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
+                y_limits_sub = [min(0,min(self.cov_full_lst_sub[c])),max(self.cov_full_lst_sub[c])]
+                covx_sub = self.covx_lst_sub[c]
+                cov_sub = self.cov_lst_sub[c]
+                if zoom_view:
+                    covx_sub = self.covx_zoom_lst_sub[c]
+                    cov_sub = self.cov_zoom_lst_sub[c]
+                    
+                min_height_sub = 0.25*max(self.cov_full_lst_sub[c])
+                max_height_sub = 0.4*max(self.cov_full_lst_sub[c])
+                
+                
+            
+            max_graphcoords = max(self.graphcoords) - 1
 
             final_plot = c==self.num_cov_tracks-1
-            ax = fig.add_subplot(gs[c,:])
-            axes.append(ax)
+            
+            cur_gs = gs[c]
+            ax = None
+            ax2 = None
+            if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
+                cur_gs = cur_gs.subgridspec(2,1,hspace=0.1,height_ratios=[2,1])
+                
+                ax = fig.add_subplot(cur_gs[0,:])
+                axes.append(ax)
+                ax2 = fig.add_subplot(cur_gs[1,:])
+                axes.append(ax2)
+                
+                ax2.spines['right'].set_color('none')
+                ax2.spines['top'].set_color('none')
+                ax2.set_xlim(0, max(self.graphcoords))
+                
+                ax2.set_ylabel(u'Δ',fontsize=self.settings["font_size"], rotation='horizontal')
+                ax2.spines["left"].set_bounds(min(self.cov_full_lst_sub[c]), max(self.cov_full_lst_sub[c]))
+                ax2.tick_params(axis='y',labelsize=self.settings["font_size"])
+    
+                ax2.set_ylim(y_limits_sub[0],y_limits_sub[1])
+                ax2.set_ybound(lower=y_limits_sub[0], upper=y_limits_sub[1])
+                ax2.yaxis.set_ticks_position('left')
+            else:
+                ax = fig.add_subplot(gs[c,:])
+                axes.append(ax)
+                
+            
+            if not final_plot:
+                ax.spines['bottom'].set_color('none')
+                ax.set_xticks([])
+                ax.set_xticks([],minor=True)
+                
+                if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
+                    ax2.spines['bottom'].set_color('none')
+                    ax2.set_xticks([])
+                    ax2.set_xticks([],minor=True)
+            else:
+                cur_ax = ax
+                if self.settings["subtract"] is not None:
+                    cur_ax = ax2
+                
+                cur_ax.xaxis.set_ticks_position('bottom')
+                cur_ax.set_xlabel("Genomic coordinates : "+self.get_coords_str(),fontsize=self.settings["font_size"])
 
-            if c==0 and not title is None:
-                ax.set_title(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
+                coords_fontsize = self.settings["font_size"] - (self.settings["font_size"] * 0.2)
+                cur_ax.set_xticks(np.linspace(0, max_graphcoords, self.settings["nxticks"]),
+                              [self.graphToGene[int(x)] for x in \
+                               np.linspace(0, max_graphcoords, self.settings["nxticks"])],
+                              fontsize=coords_fontsize)
 
             if not zoom_view:
-                ax.fill_between(covx,cov,y2=0, color=self.color_dens, lw=0)
+                ax.fill_between(covx,cov, color=self.color_dens, lw=0)
+                if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
+                    ax2.fill_between(covx_sub,cov_sub,where=np.array(cov_sub)>0, color=self.color_sub_pos, lw=0)
+                    ax2.fill_between(covx_sub,cov_sub,where=np.array(cov_sub)==0, color=self.color_sub_zero, lw=0)
+                    ax2.fill_between(covx_sub,cov_sub,where=np.array(cov_sub)<0, color=self.color_sub_neg, lw=0)
             else:
-                ax.fill_between(covx,cov,y2=0, color=self.color_dens, lw=0,step="post")
+                ax.fill_between(covx,cov, color=self.color_dens, lw=0,step="post")
+                if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
+                    ax2.fill_between(covx_sub,cov_sub,where=np.array(cov_sub)>0, color=self.color_sub_pos, lw=0)
+                    ax2.fill_between(covx_sub,cov_sub,where=np.array(cov_sub)==0, color=self.color_sub_zero, lw=0)
+                    ax2.fill_between(covx_sub,cov_sub,where=np.array(cov_sub)<0, color=self.color_sub_neg, lw=0)
 
             annotations = []
-            
-            y_limits = [0,max(self.cov_full_lst[c])]
-            
-            min_height = 0.25*max(self.cov_full_lst[c])
-            max_height = 0.4*max(self.cov_full_lst[c])
 
             if self.num_sj_tracks>0:
                 for jxn,val in self.intron_cov_lst[c].items():
@@ -680,46 +820,29 @@ class Locus:
                     pts,codes,midpt = self.get_belly_arc_coords(ss1,ss2,leftdens,rightdens,h,thickness)
 
                     if self.settings["number_junctions"]:
-                        sj_v = val[2] if rel else val[0]
+                        sj_v = val[1] if rel else val[0]
                         annotations.append(ax.annotate('%s'%(sj_v), xy=(midpt[0], midpt[1]), xytext=(midpt[0], midpt[1]+.3),fontsize=self.settings["font_size"]))
 
                     pp1 = PathPatch(Path(pts,codes),ec=self.color_spines, fc=self.color_spines,alpha=0.75,lw=2/3)
 
                     ax.add_patch(pp1) 
-
-                adjust_text(annotations, autoalign='y', expand_objects=(0.1, 1),
+                
+                adjust_text(annotations, autoalign='y', expand_objects=(0.1, 1),ax=ax,
                             only_move={'points':'', 'text':'y', 'objects':'y'}, force_text=0.75, force_objects=0.1)
 
             ax.spines['right'].set_color('none')
             ax.spines['top'].set_color('none')
-            max_graphcoords = max(self.graphcoords) - 1
             ax.set_xlim(0, max(self.graphcoords))
-
-            if not final_plot:
-                ax.spines['bottom'].set_color('none')
-                ax.set_xticks([])
-                ax.set_xticks([],minor=True)
-            else:
-                ax.xaxis.set_ticks_position('bottom')
-                ax.set_xlabel("Genomic coordinates : "+self.get_coords_str(),fontsize=self.settings["font_size"])
-
-                coords_fontsize = self.settings["font_size"] - (self.settings["font_size"] * 0.2)
-                ax.set_xticks(np.linspace(0, max_graphcoords, self.settings["nxticks"]),
-                              [self.graphToGene[int(x)] for x in \
-                               np.linspace(0, max_graphcoords, self.settings["nxticks"])],
-                              fontsize=coords_fontsize)
-
-
+            
             ax.set_ylabel("Coverage",fontsize=self.settings["font_size"])
-            ax.spines["left"].set_bounds(0, max(self.cov_full_lst[c]))
+            ax.spines["left"].set_bounds(min(self.cov_full_lst[c]), max(self.cov_full_lst[c]))
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
-
 
             ax.set_ylim(y_limits[0],y_limits[1])
             ax.set_ybound(lower=y_limits[0], upper=y_limits[1])
             ax.yaxis.set_ticks_position('left')
             if len(self.track_names)>0:
-                ax.set_xlabel(self.track_names[c],fontsize=self.settings["font_size"])
+                ax.set_title(self.track_names[c],fontsize=self.settings["font_size"])
                 
         return axes
     
@@ -899,6 +1022,8 @@ class Locus:
             fig_height *= 1.75
             
         fig = plt.figure(figsize=(self.settings["fig_width"],fig_height))
+        if title is not None:
+            plt.suptitle(title,wrap=True,fontsize=self.settings["font_size"]*1.5)
         
         gs_main = self.build_gridspace(fig)
         gs_subs = []
@@ -1014,6 +1139,8 @@ def sashimi(args):
                 "pickle": args.pickle,
                 "compare": args.compare,
                 "all_junctions": args.all_junctions,
+                "normalize": args.normalize,
+                "subtract": args.subtract,
                 "zoom_start":args.zoom_start,
                 "zoom_end":args.zoom_end,
                 "zoom":args.zoom_start is not None and args.zoom_end is not None}
@@ -1144,6 +1271,12 @@ def sashimi(args):
                         locus.add_introns(tmp)
         else:
             locus.add_introns(args.sj)
+            
+    if args.normalize:
+        locus.norm_scale()
+        
+    if args.subtract is not None:
+        locus.subtract(args.subtract)
 
     # add track names
     if args.tn is not None:
@@ -1177,6 +1310,14 @@ def main(args):
                         action="store_true",
                         required=False,
                         help="Display junciton coverage valus as relative usage of the junction compared to average junciton usage.")
+    parser.add_argument("--normalize",
+                        action="store_true",
+                        required=False,
+                        help="Normalize coverage and junciton data")
+    parser.add_argument("--subtract",
+                        type=int,
+                        required=False,
+                        help="Provide an index of the file in the list of coverages to subtract it from all other coverage plots (eg. if you want to subtract the topmost coverage data from the rest - value is 0).")
     parser.add_argument("-o",
                         "--output",
                         type=str,

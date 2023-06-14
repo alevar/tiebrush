@@ -306,6 +306,8 @@ class Locus:
         self.covx_lst = list()
         self.cov_lst = list()
         self.cov_full_lst = list()
+        self.y_limits = list()
+        self.normalized = False
         
         # these contain values for the zoomed-in view if requested
         self.covx_zoom_lst = list()
@@ -314,10 +316,14 @@ class Locus:
         
         self.subtract_coverage_idx = None
         self.cov_full_lst_sub = list()
+        self.cov_ymin_sub = 1000000
+        self.cov_ymax_sub = -1000000
         self.covx_lst_sub = list()
         self.cov_lst_sub = list()
         self.covx_zoom_lst_sub = list()
         self.cov_zoom_lst_sub = list()
+        self.cov_zoom_ymin_sub = -1
+        self.cov_zoom_ymax_sub = 1
 
         self.settings = None
 
@@ -428,9 +434,50 @@ class Locus:
                     self.track_names.append(line.strip())
         else:
             self.track_names.append(name_fname)
-            
+
+    def set_limits(self):
+        self.y_limits = [list() for x in range(self.num_cov_tracks)]
+
+        # now set the ylimits
+        min_ymin = 0
+        max_ymax = 0
+        for c in range(self.num_cov_tracks):
+            min_height = 0.25*max(self.cov_full_lst[c])
+            max_height = 0.4*max(self.cov_full_lst[c])
+
+            self.y_limits[c] = [min(0,min(self.cov_full_lst[c])),max(self.cov_full_lst[c])]
+
+            if self.num_sj_tracks>0:
+                for jxn,val in self.intron_cov_lst[c].items():
+                    leftss, rightss = jxn
+
+                    ss1, ss2 = [self.graphcoords[leftss - self.get_start() - 1],
+                                self.graphcoords[rightss - self.get_start()]]
+
+                    leftdens = self.cov_full_lst[c][leftss - self.get_start()-1]
+                    rightdens = self.cov_full_lst[c][rightss - self.get_start()]
+                    maxdens = max(leftdens,rightdens)
+                    
+                    h = min(maxdens*0.75,max_height)
+                    h = max(h,min_height)
+                    
+                    # for the super small values - we need to make the height higher
+                    # for super tall values - need smaller
+                    # else standardized
+                    
+                    thickness = min(max(self.cov_full_lst[c])*0.1,val[0]*0.1)
+                    self.y_limits[c][1] = max(self.y_limits[c][1],maxdens+h+(thickness/2))
+
+            min_ymin = min(min_ymin,self.y_limits[c][0])
+            max_ymax = max(max_ymax,self.y_limits[c][1])
+
+        # since we are normalizing - the max value is set for every plot
+        if self.normalized:
+            for c in range(self.num_cov_tracks):
+                self.y_limits[c] = (min_ymin,max_ymax)
             
     def norm_scale(self): # normalizes and scales coverage and junction data
+        self.normalized = True
         for i,l in enumerate(self.cov_full_lst):
             #compute total coverage over the plotted region in a give coverage track
             total_cov = 0
@@ -456,6 +503,7 @@ class Locus:
                 # now do the same to the junctions
                 for k,v in self.intron_cov_lst[i].items():
                     self.intron_cov_lst[i][k][0] = round(self.intron_cov_lst[i][k][0]/factor,2)
+            
                 
     def subtract(self,cov_idx):
         
@@ -473,6 +521,9 @@ class Locus:
                 continue
             for i2,c in enumerate(self.cov_full_lst[i1]):
                 self.cov_full_lst_sub[i1].append(c-self.cov_full_lst[cov_idx][i2])
+
+            self.cov_ymin_sub = min(self.cov_ymin_sub,min(self.cov_full_lst_sub[i1]))
+            self.cov_ymax_sub = max(self.cov_ymax_sub,max(self.cov_full_lst_sub[i1]))
                 
             # compress the vals
             self.covx_lst_sub[i1], self.cov_lst_sub[i1] = self.compress_intervals(self.cov_full_lst_sub[i1], self.graphcoords,self.settings["resolution"])
@@ -481,6 +532,9 @@ class Locus:
                 zoom_resolution = max(1,int(self.settings["resolution"]*self.zoom_ratio))
                 
                 self.covx_zoom_lst_sub[i1],self.cov_zoom_lst_sub[i1] = self.compress_intervals(self.cov_full_lst_sub[i1], self.graphcoords,zoom_resolution)
+
+                self.cov_zoom_ymin_sub = min(self.cov_zoom_ymin_sub,min(self.cov_zoom_lst_sub[i1]))
+                self.cov_zoom_ymax_sub = max(self.cov_zoom_ymax_sub,max(self.cov_zoom_lst_sub[i1]))
 
     def add_introns(self,sj_fname):
         assert os.path.exists(sj_fname),"Splice Junction track does not exist"
@@ -611,8 +665,7 @@ class Locus:
             
             zoom_resolution = max(1,int(self.settings["resolution"]*self.zoom_ratio))
             
-            self.covx_zoom_lst[-1],self.cov_zoom_lst[-1] = self.compress_intervals(self.cov_full_lst[-1], self.graphcoords,zoom_resolution)
-            
+            self.covx_zoom_lst[-1],self.cov_zoom_lst[-1] = self.compress_intervals(self.cov_full_lst[-1], self.graphcoords,zoom_resolution)            
 
     def get_coords_str(self):
         return self.seqid + self.strand + ":" + str(self.get_start()) + "-" + str(self.get_end())
@@ -696,7 +749,6 @@ class Locus:
         axes = []
 
         for c in range(self.num_cov_tracks):
-            y_limits = [min(0,min(self.cov_full_lst[c])),max(self.cov_full_lst[c])]
             y_limits_sub = None
             
             min_height = 0.25*max(self.cov_full_lst[c])
@@ -708,10 +760,6 @@ class Locus:
                 covx = self.covx_zoom_lst[c]
                 cov = self.cov_zoom_lst[c]
                 
-                
-                
-            min_height_sub = None
-            max_height_sub = None
             covx_sub = None
             cov_sub = None
             if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
@@ -721,10 +769,6 @@ class Locus:
                 if zoom_view:
                     covx_sub = self.covx_zoom_lst_sub[c]
                     cov_sub = self.cov_zoom_lst_sub[c]
-                    
-                min_height_sub = 0.25*max(self.cov_full_lst_sub[c])
-                max_height_sub = 0.4*max(self.cov_full_lst_sub[c])
-                
                 
             
             max_graphcoords = max(self.graphcoords) - 1
@@ -734,25 +778,27 @@ class Locus:
             cur_gs = gs[c]
             ax = None
             ax2 = None
-            if self.settings["subtract"] is not None and not c==self.settings["subtract"]:
+            if self.settings["subtract"] is not None:
                 cur_gs = cur_gs.subgridspec(2,1,hspace=0.1,height_ratios=[2,1])
                 
                 ax = fig.add_subplot(cur_gs[0,:])
                 axes.append(ax)
-                ax2 = fig.add_subplot(cur_gs[1,:])
-                axes.append(ax2)
+
+                if not c==self.settings["subtract"]:
+                    ax2 = fig.add_subplot(cur_gs[1,:])
+                    axes.append(ax2)
                 
-                ax2.spines['right'].set_color('none')
-                ax2.spines['top'].set_color('none')
-                ax2.set_xlim(0, max(self.graphcoords))
-                
-                ax2.set_ylabel(u'Δ',fontsize=self.settings["font_size"], rotation='horizontal')
-                ax2.spines["left"].set_bounds(min(self.cov_full_lst_sub[c]), max(self.cov_full_lst_sub[c]))
-                ax2.tick_params(axis='y',labelsize=self.settings["font_size"])
-    
-                ax2.set_ylim(y_limits_sub[0],y_limits_sub[1])
-                ax2.set_ybound(lower=y_limits_sub[0], upper=y_limits_sub[1])
-                ax2.yaxis.set_ticks_position('left')
+                    ax2.spines['right'].set_color('none')
+                    ax2.spines['top'].set_color('none')
+                    ax2.set_xlim(0, max(self.graphcoords))
+                    
+                    ax2.set_ylabel(u'Δ',fontsize=self.settings["font_size"], rotation='horizontal')
+                    ax2.spines["left"].set_bounds(self.cov_ymin_sub, self.cov_ymax_sub)
+                    ax2.tick_params(axis='y',labelsize=self.settings["font_size"])
+        
+                    ax2.set_ylim(self.cov_ymin_sub, self.cov_ymax_sub)
+                    ax2.set_ybound(lower=self.cov_ymin_sub, upper=self.cov_ymax_sub)
+                    ax2.yaxis.set_ticks_position('left')
             else:
                 ax = fig.add_subplot(gs[c,:])
                 axes.append(ax)
@@ -815,7 +861,6 @@ class Locus:
                     # else standardized
                     
                     thickness = min(max(self.cov_full_lst[c])*0.1,val[0]*0.1)
-                    y_limits[1] = max(y_limits[1],maxdens+h+(thickness/2))
                     
                     pts,codes,midpt = self.get_belly_arc_coords(ss1,ss2,leftdens,rightdens,h,thickness)
 
@@ -835,11 +880,11 @@ class Locus:
             ax.set_xlim(0, max(self.graphcoords))
             
             ax.set_ylabel("Coverage",fontsize=self.settings["font_size"])
-            ax.spines["left"].set_bounds(min(self.cov_full_lst[c]), max(self.cov_full_lst[c]))
+            # ax.spines["left"].set_bounds(min(self.cov_full_lst[c]), max(self.cov_full_lst[c]))
             ax.tick_params(axis='y',labelsize=self.settings["font_size"])
 
-            ax.set_ylim(y_limits[0],y_limits[1])
-            ax.set_ybound(lower=y_limits[0], upper=y_limits[1])
+            ax.set_ylim(self.y_limits[c][0],self.y_limits[c][1])
+            # ax.set_ybound(lower=self.y_limits[c][0], upper=self.y_limits[c][1])
             ax.yaxis.set_ticks_position('left')
             if len(self.track_names)>0:
                 ax.set_title(self.track_names[c],fontsize=self.settings["font_size"])
@@ -1281,6 +1326,8 @@ def sashimi(args):
     # add track names
     if args.tn is not None:
         locus.add_track_names(args.tn)
+
+    locus.set_limits()
 
     title = None
     if not args.title is None:

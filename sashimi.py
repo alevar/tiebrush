@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from intervaltree import Interval, IntervalTree
 import numpy as np
 import argparse
 import pickle
@@ -154,8 +155,8 @@ class TX:
     def __init__(self):
         self.seqid = None
         self.strand = None
-        self.exons = []
-        self.orf = []
+        self.exons = IntervalTree()
+        self.orf = IntervalTree()
 
         self.tid = None
         self.dummy = False
@@ -168,8 +169,8 @@ class TX:
     def clear(self):
         self.seqid = None
         self.strand = None
-        self.exons = []
-        self.orf = []
+        self.exons = IntervalTree()
+        self.orf = IntervalTree()
 
         self.tid = None
         self.dummy = False
@@ -186,9 +187,9 @@ class TX:
     def set_strand(self,strand):
         self.strand = strand
     def set_exons(self,exons):
-        self.exons = exons
+        self.exons = IntervalTree.from_tuples(exons)
     def set_orf(self,orf):
-        self.orf = orf
+        self.orf = IntervalTree.from_tuples(orf)
     def set_tid(self,tid):
         self.tid = tid
     def set_dummy(self,dummy):
@@ -223,13 +224,13 @@ class TX:
                 continue
 
             if lcs[2].lower() == "exon":
-                self.exons.append([int(lcs[3]), int(lcs[4])])
+                self.exons.add(Interval(int(lcs[3]), int(lcs[4])))
             if self.store_cds and lcs[2].lower() == "cds":
-                self.orf.append([int(lcs[3]), int(lcs[4])])
+                self.orf.append(Interval(int(lcs[3]), int(lcs[4])))
 
         # sort exons and orf
-        self.exons.sort(key=lambda l: l[0])
-        self.orf.sort(key=lambda l: l[0])
+        self.exons = sorted(self.exons)
+        self.orf = sorted(self.orf)
 
         assert self.tid is not None, "tid not set"
         assert len(self.exons) > 0, "exon chain is empty"
@@ -292,7 +293,7 @@ class Locus:
         self.seqid = None
         self.strand = None
 
-        self.intervals = []  # union of all exons in the locus (minus the introns)
+        self.intervals = IntervalTree()  # union of all exons in the locus (minus the introns)
         self.introns = dict()
         self.intron_cov_lst = list()
         self.track_names = list()
@@ -391,10 +392,13 @@ class Locus:
         self.seqid = tx.get_seqid()
         self.strand = tx.get_strand()
 
-        self.intervals = Locus.union(self.intervals + tx.exons)
+        # self.intervals = Locus.union(self.intervals + tx.exons)
+        # print(self.intervals)
+        self.intervals.update(tx.exons)
+        self.intervals.merge_overlaps()
 
         intron = [-1, -1]
-        for s, e in tx.exons:
+        for s, e, _ in tx.exons:
             self.exon_starts.append(s)
             self.exon_ends.append(e)
 
@@ -422,10 +426,10 @@ class Locus:
             self.zoom_ratio = 1 if not self.settings["zoom"] else (zoom_end_transform-zoom_start_transform)/(self.get_end()-self.get_start())
 
     def get_start(self):
-        return self.intervals[0][0]
+        return sorted(self.intervals)[0][0]
 
     def get_end(self):
-        return self.intervals[-1][1]
+        return sorted(self.intervals)[-1][1]
 
     def add_track_names(self,name_fname):
         if os.path.exists(name_fname):
@@ -653,6 +657,11 @@ class Locus:
 
                 # process coverage
                 for v in range(int(lcs[1]), min(self.get_end(),int(lcs[2])), 1):
+                    if self.settings["remove_intron_coverage"]:
+                        if len(self.intervals[v])==0: # if this mode is enabled, then coverage at all intronic bases will be set to 0
+                            self.cov_full_lst[-1][v - self.get_start()] = 0
+                            continue
+
                     self.cov_full_lst[-1][v - self.get_start()] = int(lcs[3])
 
         # compress the vals
@@ -943,7 +952,7 @@ class Locus:
 
             else:
                 cur_orf = [o for o in tx.orf]
-                for s, e in cur_orf:
+                for s, e, _ in cur_orf:
                     s = s - locus_start
                     e = e - locus_start
                     x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
@@ -952,7 +961,7 @@ class Locus:
                     ax.fill(x, y,color=self.colors_non_compare[100][0], lw=.5, zorder=30)
 
             cur_exons = [e for e in tx.exons]  
-            for s, e in cur_exons:
+            for s, e, _ in cur_exons:
                 s = s - locus_start
                 e = e - locus_start
                 x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
@@ -1188,7 +1197,8 @@ def sashimi(args):
                 "subtract": args.subtract,
                 "zoom_start":args.zoom_start,
                 "zoom_end":args.zoom_end,
-                "zoom":args.zoom_start is not None and args.zoom_end is not None}
+                "zoom":args.zoom_start is not None and args.zoom_end is not None,
+                "remove_intron_coverage":args.remove_intron_coverage}
 
     # read in only values for which the transcriptome has been constructed
     is_gtf_lst_file = True
@@ -1455,6 +1465,10 @@ def main(args):
     parser.add_argument("--legend",
                         action="store_true",
                         help="Add legend to the plot")
+    parser.add_argument("--remove_intron_coverage",
+                        required=False,
+                        action="store_true",
+                        help="If enabled, will set coverage of any position that is not covered by exons to 0.")
 
     parser.set_defaults(func=sashimi)
     args = parser.parse_args()

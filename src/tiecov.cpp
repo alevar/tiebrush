@@ -439,7 +439,9 @@ int main(int argc, char *argv[])  {
         fprintf(soutf, "track type=bedGraph name=\"Sample Count Heatmap\" description=\"Sample Count Heatmap\" visibility=full graphType=\"heatmap\" color=200,100,0 altColor=0,100,200\n");
     }
 
-    load_sample_info(samreader.header(),sample_info);
+    if (soutf){ // only run if requested - otherwise will throw an error on non-tiebrushed inputs due to lack of sample header lines
+        load_sample_info(samreader.header(),sample_info);
+    }
 
     int prev_tid=-1;
     GVec<uint64_t> bcov(2048*1024);

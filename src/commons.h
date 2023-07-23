@@ -24,33 +24,23 @@ static inline bool parse_pg_sample_line(std::string& line) { // returns true if 
     std::stringstream *line_stream = new std::stringstream(line);
     std::string col;
 
-    // make sure it's PG
+    // make sure it's CO
     std::getline(*line_stream,col,'\t');
-    if(std::strcmp(col.c_str(),"@PG")!=0){
+    if(std::strcmp(col.c_str(),"@CO")!=0){
         delete line_stream;
         return false;
     }
 
     // check if ID == SAMPLE
-    std::getline(*line_stream,col,'\t');
-    if(std::strcmp(col.c_str(),"ID:SAMPLE")!=0){
+    std::getline(*line_stream,col,':');
+    if(std::strcmp(col.c_str(),"SAMPLE")!=0){
         delete line_stream;
         return false;
     }
 
-    std::getline(*line_stream,col,'\t');
-    std::stringstream *col_stream = new std::stringstream(col);
-    std::string kv;
-    std::getline(*col_stream,kv,':');
-    if(std::strcmp(kv.c_str(),"SP")!=0){
-        delete line_stream;
-        delete col_stream;
-        return false;
-    }
-    std::getline(*col_stream,kv,'\t');
-    line = kv;
+    std::getline(*line_stream,col,'\n');
+    line = col;
     delete line_stream;
-    delete col_stream;
     return true;
 }
 
@@ -60,14 +50,14 @@ static inline void load_sample_info(sam_hdr_t* hdr,std::vector<std::string>& inf
     std::string line;
     while(true){
         kstring_t str = KS_INITIALIZE;
-        if (sam_hdr_find_line_pos(hdr, "PG", line_pos, &str)!=0) {
+        if (sam_hdr_find_line_pos(hdr, "CO", line_pos, &str)!=0) {
             if(!found_sample_line){
                 GError("Error: no sample lines found in header");
             }
             break;
         }
         else{
-            // parse line to check if indeed SAMPLE PG
+            // parse line to check if indeed SAMPLE CO
             line = std::string(str.s);
             bool ret = parse_pg_sample_line(line);
             if(ret){

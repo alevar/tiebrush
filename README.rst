@@ -1,4 +1,4 @@
-TieBrush and TieCov - efficient methods for aggregating and summarizing aligned sequences across large datasets
+TieBrush, TieCov and Sashimi - efficient methods for aggregating and summarizing aligned sequences across large datasets
 ===============================================================================================================
 
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
@@ -11,6 +11,8 @@ TieBrush and TieCov - efficient methods for aggregating and summarizing aligned 
 
 Introduction
 ^^^^^^^^^^^^
+
+.. image:: https://raw.githubusercontent.com/alevar/tiebrush/master/example/slc25a3.sim.png?sanitize=true
 
 TieBrush is a simple yet efficient method for merging redundant information from multiple alignment files, 
 designed to enable rapid manipulation of extremely large sequencing datasets. The method is specifically 
@@ -28,6 +30,10 @@ from many sequencing samples, painting a comprehensive "background" picture of r
 with their counts across many samples.
 
     Ales Varabyou, Geo Pertea, Christopher Pockrandt, Mihaela Pertea, TieBrush: an efficient method for aggregating and summarizing mapped reads across large datasets, Bioinformatics, 2021;, btab342, https://doi.org/10.1093/bioinformatics/btab342
+
+Sashimi plot is largely based on the implementation from the MISO package. please cite both the TieBrush publication as well as the original MISO paper:
+
+    Katz, Yarden, Eric T. Wang, Jacob Silterra, Schraga Schwartz, Bang Wong, Helga Thorvaldsdóttir, James T. Robinson, Jill P. Mesirov, Edoardo M. Airoldi, and Christopher B. Burge. "Quantitative visualization of alternative exon expression from RNA-seq data." Bioinformatics 31, no. 14 (2015): 2400-2402.
 
 Installation
 ^^^^^^^^^^^^
@@ -174,3 +180,54 @@ as well as the concurrency parameters can be set explicitely.
   -F, --flags           Bits in SAM flag to use in read comparison. Only reads that have specified flags will be merged together (default: 0)
   -t, --threads         Number of threads to use.
   -b, --batch-size      Number of input files to process in a batch on each thread.
+
+Sashimi
+"""""""
+
+.. image:: https://raw.githubusercontent.com/alevar/tiebrush/master/example_sashimi/example.svg?sanitize=true
+
+Sashimi.py is a small utility script provided to create vectorized visualizzation of a locus, taking full advantage of the files created by TieBrush suite.
+
+Sashimi plot is largely based on the implementation from the MISO package. please cite both the TieBrush publication as well as the original MISO paper:
+
+    Katz, Yarden, Eric T. Wang, Jacob Silterra, Schraga Schwartz, Bang Wong, Helga Thorvaldsdóttir, James T. Robinson, Jill P. Mesirov, Edoardo M. Airoldi, and Christopher B. Burge. "Quantitative visualization of alternative exon expression from RNA-seq data." Bioinformatics 31, no. 14 (2015): 2400-2402.
+
+You must have matplotlib, adjustText and numpy installed to run sashimi.py with python3 which can be installed via
+
+    pip3 install matplotlib adjustText numpy
+
+    sashimi.py [-h] --gtf GTF [--cov COV] [--sj SJ] -o OUTPUT [--intron_scale INTRON_SCALE] 
+                  [--exon_scale EXON_SCALE] [--resolution RESOLUTION] [--fig_width FIG_WIDTH] 
+                  [--fig_height FIG_HEIGHT] [--font_size FONT_SIZE] [--nxticks NXTICKS] 
+                  [--number_junctions] [--reverse] [--title TITLE [TITLE ...]] [--pickle] 
+                  [--compare COMPARE] [--all-junctions]
+
+    options:
+      -h, --help            show this help message and exit
+      --gtf GTF             annotation in a GFF/GTF format
+      --cov COV             coverage in bedgraph format or a file containing a list of filenames with coverage in bedgraph for multiple samples. If a list is provided - the files should be in the same order as the
+                            splice junctions below (if provided)
+      --sj SJ               splice junctions in bed format or a file containing a list of filenames with splice junctions in bed format for multiple samples. If a list is provided - the files should be in the same
+                            order as the coverage tracks.
+      -o OUTPUT, --output OUTPUT
+                            Filename for the output figure. The format (png,svg, ...) will be automatically deduced based on the extension.
+      --intron_scale INTRON_SCALE
+                            Parameter regulating the scaling of the introns (Default: 20). Decreasing the integer value will scale introns down in size compared to exons.
+      --exon_scale EXON_SCALE
+                            Parameter regulating the scaling of the exons (Default: 1). Increasing the integer value will scale exons down in size compared to introns.
+      --resolution RESOLUTION
+                            Parameter regulates the smoothing factor of the coverage track (Default: 6). Increasing the value will increasing the smoothing by reducing the number of points on the coverage track.
+      --fig_width FIG_WIDTH
+                            Width of the figure in inches (Default: 20).
+      --fig_height FIG_HEIGHT
+                            Height of the figure in inches (Default: 10).
+      --font_size FONT_SIZE
+                            Size of the font (Default: 18)
+      --nxticks NXTICKS     Number of positional markers to include on the x-axis with labels (Default: 4).
+      --number_junctions    Disables labels idicating coverage of splice junctions
+      --reverse             Flips image horizontally, which is equivalent to setting strand to the opposite value.
+      --title   TITLE [TITLE ...] Title of the figure.
+      --pickle              Save a pickle alongside the figure which can be loaded into a separate instance of matplotlib for modification.
+      --compare COMPARE     Users can specify one of the input transcripts to serve as a reference. If set, all transcripts in the input will be compared to the reference and plotted using a dedicated color
+                            pallete. The comparison will visualize in-frame and out-of-frame positions as well as any intervals missing and extra between the reference and each query transcript
+      --all-junctions       Will force the script to display all junctions, including those not present in the GTF

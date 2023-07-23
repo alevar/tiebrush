@@ -1,0 +1,30 @@
+chr19	havana	transcript	44474443	44500522	.	-	.	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_type "protein_coding"; gene_name "ZNF180"; transcript_type "protein_coding"; transcript_name "ZNF180-211"; tag "MANE_Select"; protein_id "ENSP00000468021.1"; db_xref "RefSeq:NM_001278509.3"; CDS_db_xref "RefSeq:NP_001265438.2"
+chr19	havana	exon	44474443	44478146	.	-	.	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	exon	44479283	44479409	.	-	.	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	exon	44484361	44484435	.	-	.	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	exon	44497284	44497377	.	-	.	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	exon	44500275	44500522	.	-	.	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	CDS	44476402	44478146	.	-	2	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	CDS	44479283	44479409	.	-	0	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	CDS	44484361	44484435	.	-	0	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	havana	CDS	44497284	44497334	.	-	0	transcript_id "ENST00000592529.6"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	transcript	44475639	44500524	.	-	.	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	exon	44475639	44478146	.	-	.	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	exon	44479283	44479409	.	-	.	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	exon	44484361	44484435	.	-	.	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	exon	44497284	44497377	.	-	.	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	exon	44500198	44500524	.	-	.	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	CDS	44476402	44478146	.	-	2	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	CDS	44479283	44479409	.	-	0	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	CDS	44484361	44484435	.	-	0	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	CDS	44497284	44497377	.	-	1	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	CDS	44500198	44500232	.	-	0	transcript_id "ORFanage:ENST00000590088.5"
+chr19	HAVANA	transcript	44475639	44500524	.	-	.	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_type "protein_coding"; gene_name "ZNF180"; transcript_type "nonsense_mediated_decay"; transcript_name "ZNF180-206"; level "2"; protein_id "ENSP00000468523.1"; transcript_support_level "1"; hgnc_id "HGNC:12970"; havana_gene "OTTHUMG00000180495.4"; havana_transcript "OTTHUMT00000451603.2"
+chr19	HAVANA	exon	44475639	44478146	.	-	.	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	exon	44479283	44479409	.	-	.	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	exon	44484361	44484435	.	-	.	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	exon	44497284	44497377	.	-	.	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	exon	44500198	44500524	.	-	.	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	CDS	44484375	44484435	.	-	1	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	CDS	44497284	44497377	.	-	2	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";
+chr19	HAVANA	CDS	44500198	44500240	.	-	0	transcript_id "ENST00000590088.5"; gene_id "ENSG00000167384.11"; gene_name "ZNF180";

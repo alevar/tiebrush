@@ -6,11 +6,11 @@
 
 #include "commons.h"
 #include "GSam.h"
+#include <gclib/GArgs.h>
 #include "tmerge.h"
-#include "GArgs.h"
-#include "GBitVec.h"
+#include <gclib/GBitVec.h>
 
-#define VERSION "0.0.6"
+#define VERSION "0.0.7"
 
 const char* USAGE = "TieBrush v" VERSION "\n"
                               "==================\n"

@@ -433,6 +433,10 @@ int main(int argc, char *argv[])  {
     int b_start=0; //1 based
     GSamRecord brec;
     while (samreader.next(brec)) {
+        if (brec.isUnmapped()) {
+            continue;
+        }
+
         //uint32_t dupcount=0;
         std::vector<int> cur_samples;
         int endpos=brec.end;

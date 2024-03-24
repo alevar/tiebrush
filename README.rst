@@ -1,5 +1,5 @@
-TieBrush, TieCov and Sashimi - efficient methods for aggregating and summarizing aligned sequences across large datasets
-===============================================================================================================
+TieBrush, TieCov and Sashimi: efficient methods for aggregating and summarizing aligned sequences across large datasets
+=========================================================================================================================
 
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
     :target: https://opensource.org/licenses/MIT
@@ -118,13 +118,13 @@ many samples.
 Note that options -L, -P and -E are mutually exclusive. 
 
 
-SAM tags implemented
---------------------
-1. __YC__:i:N stores the number of alignments that were merged into this alignment record (multiplicity count)
-2. __YX__:i:N stores the number of samples that have this alignment (sample count)
-3. __YD__:i:N keeps track of the maximum number of contiguous bases preceding the start of the read alignment in the samples(s) that it belongs to. In other words, if the current alignment is part of an exon-overlapping bundle (strand specific!), this value holds the maximum distance from the beginning of the bundle to the start of this alignment, across all samples having this alignment. If the alignment is not in a bundle (i.e. it is preceded by a uncovered region as it is not overlapped by any another alignment with a lower start position), in all the individual samples where that alignment is present, then the YD value is 0 and the tag is omitted from the output file produced by TieBrush. That means that all the alignments lacking a YD tag in the TieBrush output start at the very beginning of an exon-overlapping bundle (i.e. are not overlapped by a preceding alignment with a lower start coordinate).
+Custom SAM tags implemented
+---------------------------
+1. **YC**:i:N stores the number of alignments that were merged into this alignment record (multiplicity count)
+2. **YX**:i:N stores the number of samples that have this alignment (sample count)
+3. **YD**:i:N keeps track of the maximum number of contiguous bases preceding the start of the read alignment in the samples(s) that it belongs to. In other words, if the current alignment is part of an exon-overlapping bundle (strand specific!), this value holds the maximum distance from the beginning of the bundle to the start of this alignment, across all samples having this alignment. If the alignment is not in a bundle (i.e. it is preceded by a uncovered region as it is not overlapped by any another alignment with a lower start position), in all the individual samples where that alignment is present, then the ``YD`` value is 0 and the tag is omitted from the output file produced by TieBrush. That means that all the alignments lacking a ``YD`` tag in the TieBrush output start at the very beginning of an exon-overlapping bundle (i.e. are not overlapped by a preceding alignment with a lower start coordinate).
 
-If either YC or YX tags are missing (i.e. GBamRecord::__tag_int__() call returns 0) then the alignment is unique (when YC is 0) or only one sample has it (if YX is 0). The actual count in these cases is obviously 1.
+If either ``YC`` or ``YX`` tags are missing (i.e. ``GBamRecord::tag_int()`` call returns 0) then the alignment is unique (when ``YC`` is 0) or only one sample has it (if ``YX`` is 0). The actual count in such cases is 1.
 
 TieCov
 """"""
@@ -144,9 +144,9 @@ The TieCov utility can take the output file produced by TieBrush and can generat
   Optional arguments (at least one of -s/-c/-j must be specified):
   
   -s    output BED file with an estimate of the number of samples which contain alignments for each interval.
-  -c    output BedGraph (or BedWig with '-W') file with coverage for all mapped bases.
   -j    output BED file with coverage of all splice-junctions in the input file.
-  -W    save coverage in BigWig format. Default output is in Bed format.
+  -c    output BedGraph (or BigWig with '-W') file with coverage for all mapped bases.
+  -W    save coverage to -c file in BigWig format. Default output is in BED format.
 
 TieWrap
 """""""

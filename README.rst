@@ -91,12 +91,14 @@ seen across all input data) and "sample count" (how many samples show that same 
 The goal is to generate this composite BAM file which multiplexes read alignments from many sequencing
 samples, painting a comprehensive "background" picture of read alignments with their counts across
 many samples.
+::
 
   tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
 
   Input arguments:
 
-  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a list of filenames, one per line
+  ...        Input can be provided as a space-delimited list of filenames or as a text file containing a 
+             list of filenames, one per line
 
   Required arguments:
 
@@ -106,14 +108,23 @@ many samples.
 
   -h, --help        Show this help message and exit
   --version         Show the program version end exit
-  -L, --full        If enabled, only reads with the same CIGAR and MD strings will be grouped and collapsed. By default, TieBrush will consider the CIGAR string only when grouping reads
-  -P, --clip        If enabled, reads will be grouped by clipped CIGAR string. In this mode 5S10M5S and 3S10M3S CIGAR strings will be grouped if the coordinates of the matching substring (10M) are the same between reads
-  -E, --exon        If enabled, reads will be grouped if their exon boundaries are the same. This option discards any structural variants contained in mapped substrings of the read and only considers start and end coordinates of each non-splicing segment of the CIGAR string
-  -S, --keep-supp   If enabled, supplementary alignments will be included in the collapsed groups of reads. By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each supplementary mapping will count as a separate read
-  -M, --keep-unmap  If enabled, unmapped reads will be retained (uncollapsed) in the output. By default, TieBrush removes any unmapped reads
+  -L, --full        If enabled, only reads with the same CIGAR and MD strings will be grouped and collapsed. 
+                    By default, TieBrush will consider the CIGAR string only when grouping reads
+  -P, --clip        If enabled, reads will be grouped by clipped CIGAR string. In this mode 5S10M5S and 
+                    3S10M3S CIGAR strings will be grouped if the coordinates of the matching substring (10M) 
+                    are the same between reads
+  -E, --exon        If enabled, reads will be grouped if their exon boundaries are the same. This option discards
+                    any structural variants contained in mapped substrings of the read and only considers start 
+                    and end coordinates of each non-splicing segment of the CIGAR string
+  -S, --keep-supp   If enabled, supplementary alignments will be included in the collapsed groups of reads. 
+                    By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled,
+                    each supplementary mapping will count as a separate read
+  -M, --keep-unmap  If enabled, unmapped reads will be retained (uncollapsed) in the output. 
+                    By default, TieBrush removes any unmapped reads
   -N                Maximum NH score (if available) to include.
   -Q                Minimum mapping quality to include.
-  -F                Bits in SAM flag to use in read comparison. Only reads that have specified flags will be merged together (default: 0)
+  -F                Bits in SAM flag to use in read comparison. Only reads that have specified flags will be
+                    merged together (default: 0)
 
 Note that options -L, -P and -E are mutually exclusive. 
 
@@ -135,6 +146,8 @@ The TieCov utility can take the output file produced by TieBrush and can generat
 2. a junction BED file which can be loaded directly in IGV as an additional junction track (http://software.broadinstitute.org/software/igv/splice_junctions)
 3. a heatmap BED that uses color intensity to represent the number of samples that contain each position.
 
+::
+
   tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] input
   
   Input arguments (required):
@@ -143,7 +156,8 @@ The TieCov utility can take the output file produced by TieBrush and can generat
   
   Optional arguments (at least one of -s/-c/-j must be specified):
   
-  -s    output BED file with an estimate of the number of samples which contain alignments for each interval.
+  -s    output BED file with an estimate of the number of samples which contain alignments 
+        for each interval.
   -j    output BED file with coverage of all splice-junctions in the input file.
   -c    output BedGraph (or BigWig with '-W') file with coverage for all mapped bases.
   -W    save coverage to -c file in BigWig format. Default output is in BED format.
@@ -157,11 +171,14 @@ divide them into batches processing and combining batches to produce a single re
 All standard TieBrush arguments can be passed over to TieWrap. Additionally size of individual batches
 as well as the concurrency parameters can be set explicitely.
 
+::
+
   tiewrap.py [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N MAX_NH] [-Q MIN_MAP_QUAL] [-F FLAGS] [-t THREADS] [-b BATCH_SIZE] ...
 
   Input arguments:
 
-  ...       Input can be provided as a space-delimited list of filenames or as a textfile containing a list of filenames one per each line.
+  ...       Input can be provided as a space-delimited list of filenames or as a textfile containing a list of 
+            filenames one per each line.
 
   Required arguments:
 
@@ -170,14 +187,23 @@ as well as the concurrency parameters can be set explicitely.
   Optional arguments:
 
   -h, --help            show this help message and exit
-  -L, --full            If enabled, only reads with the same CIGAR and MD strings will be grouped and collapsed. By default, TieBrush will consider the CIGAR string only when grouping reads.
-  -P, --clip            If enabled, reads will be grouped by clipped CIGAR string. In this mode 5S10M5S and 3S10M3S cigar strings will be grouped if the coordinates of the matching substring (10M) are the same between reads.
-  -E, --exon            If enabled, reads will be grouped if their exon boundaries are the same. This option discards any structural variants contained in mapped substrings of the read and only considers start and end coordinates of each non-splicing segment of the CIGAR string.
-  -S, --keep-supp       If enabled, supplementary alignments will be included in the collapsed groups of reads. By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each supplementary mapping will count as a separate read.
-  -M, --keep-unmap      If enabled, unmapped reads will be retained (uncollapsed) in the output. By default, TieBrush removes any unmapped reads.
+  -L, --full            If enabled, only reads with the same CIGAR and MD strings will be grouped and collapsed. 
+                        By default, TieBrush will consider the CIGAR string only when grouping reads.
+  -P, --clip            If enabled, reads will be grouped by clipped CIGAR string. In this mode 5S10M5S and 
+                        3S10M3S cigar strings will be grouped if the coordinates of the matching substring (10M) 
+                        are the same between reads.
+  -E, --exon            If enabled, reads will be grouped if their exon boundaries are the same. This option discards
+                        any structural variants contained in mapped substrings of the read and only considers start and 
+                        end coordinates of each non-splicing segment of the CIGAR string.
+  -S, --keep-supp       If enabled, supplementary alignments will be included in the collapsed groups of reads. By default, 
+                        TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each 
+                        supplementary mapping will count as a separate read.
+  -M, --keep-unmap      If enabled, unmapped reads will be retained (uncollapsed) in the output. 
+                        By default, TieBrush removes any unmapped reads.
   -N, --max-nh          Maximum NH score of the reads to retain.
   -Q, --min-map-qual    Minimum mapping quality of the reads to retain.
-  -F, --flags           Bits in SAM flag to use in read comparison. Only reads that have specified flags will be merged together (default: 0)
+  -F, --flags           Bits in SAM flag to use in read comparison. Only reads that have specified flags will be merged 
+                        together (default: 0)
   -t, --threads         Number of threads to use.
   -b, --batch-size      Number of input files to process in a batch on each thread.
 
@@ -194,6 +220,8 @@ Sashimi plot is largely based on the implementation from the MISO package. pleas
 
 You must have matplotlib, adjustText and numpy installed to run sashimi.py with python3 which can be installed via
 
+::
+
     pip3 install matplotlib adjustText numpy
 
     sashimi.py [-h] --gtf GTF [--cov COV] [--sj SJ] -o OUTPUT [--intron_scale INTRON_SCALE] 
@@ -205,18 +233,24 @@ You must have matplotlib, adjustText and numpy installed to run sashimi.py with 
     options:
       -h, --help            show this help message and exit
       --gtf GTF             annotation in a GFF/GTF format
-      --cov COV             coverage in bedgraph format or a file containing a list of filenames with coverage in bedgraph for multiple samples. If a list is provided - the files should be in the same order as the
-                            splice junctions below (if provided)
-      --sj SJ               splice junctions in bed format or a file containing a list of filenames with splice junctions in bed format for multiple samples. If a list is provided - the files should be in the same
-                            order as the coverage tracks.
+      --cov COV             coverage in bedgraph format or a file containing a list of filenames with coverage
+                            in bedgraph for multiple samples. If a list is provided - the files should be in 
+                            the same order as the splice junctions below (if provided)
+      --sj SJ               splice junctions in bed format or a file containing a list of filenames with splice 
+                            junctions in bed format for multiple samples. If a list is provided - the files 
+                            should be in the same order as the coverage tracks.
       -o OUTPUT, --output OUTPUT
-                            Filename for the output figure. The format (png,svg, ...) will be automatically deduced based on the extension.
+                            Filename for the output figure. The format (png,svg, ...) will be automatically 
+                            deduced based on the extension.
       --intron_scale INTRON_SCALE
-                            Parameter regulating the scaling of the introns (Default: 20). Decreasing the integer value will scale introns down in size compared to exons.
+                            Parameter regulating the scaling of the introns (Default: 20). Decreasing the integer 
+                            value will scale introns down in size compared to exons.
       --exon_scale EXON_SCALE
-                            Parameter regulating the scaling of the exons (Default: 1). Increasing the integer value will scale exons down in size compared to introns.
+                            Parameter regulating the scaling of the exons (Default: 1). Increasing the integer 
+                            value will scale exons down in size compared to introns.
       --resolution RESOLUTION
-                            Parameter regulates the smoothing factor of the coverage track (Default: 6). Increasing the value will increasing the smoothing by reducing the number of points on the coverage track.
+                            Parameter regulates the smoothing factor of the coverage track (Default: 6). Increasing 
+                            the value will increase the smoothing by reducing the number of points on the coverage track.
       --fig_width FIG_WIDTH
                             Width of the figure in inches (Default: 20).
       --fig_height FIG_HEIGHT
@@ -227,7 +261,10 @@ You must have matplotlib, adjustText and numpy installed to run sashimi.py with 
       --number_junctions    Disables labels idicating coverage of splice junctions
       --reverse             Flips image horizontally, which is equivalent to setting strand to the opposite value.
       --title   TITLE [TITLE ...] Title of the figure.
-      --pickle              Save a pickle alongside the figure which can be loaded into a separate instance of matplotlib for modification.
-      --compare COMPARE     Users can specify one of the input transcripts to serve as a reference. If set, all transcripts in the input will be compared to the reference and plotted using a dedicated color
-                            pallete. The comparison will visualize in-frame and out-of-frame positions as well as any intervals missing and extra between the reference and each query transcript
+      --pickle              Save a pickle alongside the figure which can be loaded into a separate instance of 
+                            matplotlib for modification.
+      --compare COMPARE     Users can specify one of the input transcripts to serve as a reference. If set, all 
+                            transcripts in the input will be compared to the reference and plotted using a dedicated
+                            color pallete. The comparison will visualize in-frame and out-of-frame positions as well
+                            as any intervals missing and extra between the reference and each query transcript
       --all-junctions       Will force the script to display all junctions, including those not present in the GTF

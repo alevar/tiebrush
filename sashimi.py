@@ -397,6 +397,12 @@ class Locus:
         self.intervals.update(tx.exons)
         self.intervals.merge_overlaps()
 
+        self.txs.append(tx)
+        self.groups.append(group)
+
+        if ref:
+            self.ref_tx = len(self.txs)-1
+
         intron = [-1, -1]
         for s, e, _ in tx.exons:
             self.exon_starts.append(s)
@@ -406,12 +412,6 @@ class Locus:
             if not intron[0] == -1:
                 self.introns[tuple(intron)] = 0
             intron[0] = e
-
-        self.txs.append(tx)
-        self.groups.append(group)
-
-        if ref:
-            self.ref_tx = len(self.txs)-1
 
     def set_scaling(self):
         # get graphcoords
@@ -833,8 +833,8 @@ class Locus:
                 coords_fontsize = self.settings["font_size"] - (self.settings["font_size"] * 0.2)
                 cur_ax.set_xticks(np.linspace(0, max_graphcoords, self.settings["nxticks"]),
                               [self.graphToGene[int(x)] for x in \
-                               np.linspace(0, max_graphcoords, self.settings["nxticks"])])
-                cur_ax.tick_params(axis='x',which='both',labelsize=coords_fontsize)
+                               np.linspace(0, max_graphcoords, self.settings["nxticks"])],
+                              fontsize=coords_fontsize)
 
             if not zoom_view:
                 ax.fill_between(covx,cov, color=self.color_dens, lw=0)
@@ -1082,7 +1082,7 @@ class Locus:
         gs_main = self.build_gridspace(fig)
         gs_subs = []
         
-        for nr in range(gs_main.get_geometry()[0]):
+        for nr in range(gs_main.nrows):
             gs_sub_cov,gs_sub_tx = self.build_cov_tx_grid(fig,gs_main[nr],nr==1)
             gs_subs.append([(gs_sub_cov,gs_sub_tx),[]])
             
@@ -1198,8 +1198,7 @@ def sashimi(args):
                 "zoom_start":args.zoom_start,
                 "zoom_end":args.zoom_end,
                 "zoom":args.zoom_start is not None and args.zoom_end is not None,
-                "remove_intron_coverage":args.remove_intron_coverage,
-                "extend_by":args.extend_by}
+                "remove_intron_coverage":args.remove_intron_coverage}
 
     # read in only values for which the transcriptome has been constructed
     is_gtf_lst_file = True
@@ -1268,16 +1267,26 @@ def sashimi(args):
             found_ref = found_ref or is_ref
             locus.add_tx(tx,is_ref,grp)
 
-    # dummy transcript if extending locus coordinates
+    # dummy transcripts at the 3' and 5' ends if extending locus coordinates
     dummy = None
     if args.extend_by is not None:
-        dummy = TX()
-        dummy.set_seqid(locus.seqid)
-        dummy.set_strand(locus.strand)
-        dummy.set_exons([(locus.get_start()-args.extend_by,locus.get_end()+args.extend_by)])
-        dummy.set_orf([])
-        dummy.set_tid("dummy")
-        dummy.set_dummy(True)
+        dummy_3p = TX()
+        dummy_3p.set_seqid(locus.seqid)
+        dummy_3p.set_strand(locus.strand)
+        dummy_3p.set_exons([(locus.get_start()-args.extend_by,locus.get_start())])
+        dummy_3p.set_orf([])
+        dummy_3p.set_tid("dummy")
+        dummy_3p.set_dummy(True)
+        locus.add_tx(dummy_3p,ref=False)
+
+        dummy_5p = TX()
+        dummy_5p.set_seqid(locus.seqid)
+        dummy_5p.set_strand(locus.strand)
+        dummy_5p.set_exons([(locus.get_end(),locus.get_end()+args.extend_by)])
+        dummy_5p.set_orf([])
+        dummy_5p.set_tid("dummy")
+        dummy_5p.set_dummy(True)
+        locus.add_tx(dummy_5p,ref=False)
 
     # if requested - read junctions and create a dummy transcript spanning min to max junc/transcript values
     if args.all_junctions and args.sj is not None:
@@ -1291,9 +1300,7 @@ def sashimi(args):
         dummy.set_orf([])
         dummy.set_tid("dummy")
         dummy.set_dummy(True)
-
-    if dummy is not None:
-        locus.add_tx(dummy,False)
+        locus.add_tx(dummy,ref=False)
 
     locus.set_scaling()
 
@@ -1486,7 +1493,6 @@ def main(args):
     parser.add_argument("--extend_by",
                         required=False,
                         type=int,
-                        default=False,
                         help="Extend the GTF coordinates by the specified number of bases in both directions. For positions beyond the GTF coordinate range, all data (coverage, junctions, comparisons) will be displayed. If multiple GTFs have been provided - the smallest and greatest positions will be extended.")
 
     parser.set_defaults(func=sashimi)

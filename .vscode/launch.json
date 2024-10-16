@@ -25,6 +25,22 @@
             ] /*,
             "preLaunchTask": "C/C++: g++.exe build active file"
             */
+        },
+        {
+            "name": "sashimi debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/sashimi.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--title","RERE",
+                "--gtf","${workspaceFolder}/example_sashimi/AY69_E3p3_RERE.gtf",
+                "--cov","${workspaceFolder}/example_sashimi/AY69_E3p3_RERE.all.cov.bedgraph",
+                "-o","${workspaceFolder}/example_sashimi/AY69_E3p3_RERE.png",
+                "--intron_scale","10",
+                "--extend_by","7000",
+            ],
         }
+        
     ]
 }

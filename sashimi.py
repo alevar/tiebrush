@@ -226,7 +226,11 @@ class TX:
             if lcs[2].lower() == "exon":
                 self.exons.add(Interval(int(lcs[3]), int(lcs[4])))
             if self.store_cds and lcs[2].lower() == "cds":
-                self.orf.append(Interval(int(lcs[3]), int(lcs[4])))
+                if int(lcs[3]) != int(lcs[4]):
+                    self.orf.append(Interval(int(lcs[3]), int(lcs[4])))
+                else:
+                    print(f"Skipping null interval: ({lcs[3]}, {lcs[4]})")
+                
 
         # sort exons and orf
         self.exons = sorted(self.exons)
@@ -900,7 +904,7 @@ class Locus:
                 
         return axes
     
-    def plot_txs(self,fig,gs,title,compare,text_attr,rel,zoom_view):
+    def plot_txs(self,fig,gs,graphcoords,title,compare,text_attr,rel,zoom_view):
         
         axes = []
         
@@ -933,7 +937,7 @@ class Locus:
                 for s, e, l in stack:                        
                     s = s - locus_start
                     e = e - locus_start
-                    x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
+                    x = [graphcoords[s], graphcoords[e], graphcoords[e], graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
                     
                     ax.fill(x, y,linestyle="-",color=self.colors_compare[l][0],lw=2,zorder=30,fill=False)
@@ -943,7 +947,7 @@ class Locus:
                 if self.ref_tx == i:
                     facecolor_set = True
                     ax.set_facecolor((1,0,0,0.1))
-                    #x = [self.graphcoords[0], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[self.get_end()-self.get_start()], self.graphcoords[0]]
+                    #x = [graphcoords[0], graphcoords[self.get_end()-self.get_start()], graphcoords[self.get_end()-self.get_start()], graphcoords[0]]
                     #y = [-exonwidth / 5, -exonwidth / 5, exonwidth / 5, exonwidth / 5]
                     #ax.fill(x, y,linestyle="-",color="xkcd:salmon",alpha=0.15,lw=2,zorder=30,fill=True)
 
@@ -952,7 +956,7 @@ class Locus:
                 for s, e, _ in cur_orf:
                     s = s - locus_start
                     e = e - locus_start
-                    x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
+                    x = [graphcoords[s], graphcoords[e], graphcoords[e], graphcoords[s]]
                     y = [-exonwidth / 6, -exonwidth / 6, exonwidth / 6, exonwidth / 6]
                     ax.fill(x, y,linestyle="-",color=self.colors_non_compare[100][0],lw=2,zorder=30,fill=False)
                     ax.fill(x, y,color=self.colors_non_compare[100][0], lw=.5, zorder=30)
@@ -961,14 +965,14 @@ class Locus:
             for s, e, _ in cur_exons:
                 s = s - locus_start
                 e = e - locus_start
-                x = [self.graphcoords[s], self.graphcoords[e], self.graphcoords[e], self.graphcoords[s]]
+                x = [graphcoords[s], graphcoords[e], graphcoords[e], graphcoords[s]]
                 y = [-exonwidth / 8, -exonwidth / 8, exonwidth / 8, exonwidth / 8]
                 ax.fill(x, y, color=self.colors_non_compare[0][0], lw=.5, zorder=20)
 
             # Draw intron.
             tx_start = tx.get_start() - locus_start
             tx_end = tx.get_end() - locus_start
-            max_val = max(self.graphcoords)
+            max_val = max(graphcoords)
             
             tx_start = tx.get_start() - locus_start
             tx_end = tx.get_end() - locus_start
@@ -1088,7 +1092,7 @@ class Locus:
             # add data
             axes = self.plot_coverage(fig,gs_sub_cov,title,compare,text_attr,rel,nr==1)
             gs_subs[-1][1].extend(axes)
-            axes = self.plot_txs(fig,gs_sub_tx,title,compare,text_attr,rel,nr==1)
+            axes = self.plot_txs(fig,gs_sub_tx,self.graphcoords,title,compare,text_attr,rel,nr==1)
             gs_subs[-1][1].extend(axes)
             
             if nr==1:

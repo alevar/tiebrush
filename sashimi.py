@@ -906,9 +906,6 @@ class Locus:
         
         exonwidth = .3
         narrows = 50
-        if zoom_view:
-            narrows /= self.zoom_ratio
-            narrows = int(narrows)
 
         locus_start = self.get_start()
 
@@ -972,10 +969,12 @@ class Locus:
             tx_start = tx.get_start() - locus_start
             tx_end = tx.get_end() - locus_start
             max_val = max(self.graphcoords)
-
-            hline_left = self.graphcoords[tx_start]/max_val
-            hline_right = self.graphcoords[tx_end]/max_val
-            ax.axhline(0,xmin=hline_left,xmax=hline_right, color=self.colors_non_compare[0][0], lw=2)
+            
+            tx_start = tx.get_start() - locus_start
+            tx_end = tx.get_end() - locus_start
+            x = [self.graphcoords[tx_start], self.graphcoords[tx_end], self.graphcoords[tx_end], self.graphcoords[tx_start]]
+            y = [-exonwidth / 100, -exonwidth / 100, exonwidth / 100, exonwidth / 100]
+            ax.fill(x, y, color=self.colors_non_compare[0][0], lw=.5, zorder=20)
 
             # Draw intron arrows.
             spread = .2 * max_val / narrows
@@ -1094,13 +1093,22 @@ class Locus:
             
             if nr==1:
                 # remove axis labels, etc
-                for ax in gs_subs[-1][1]:
+                for axi,ax in enumerate(gs_subs[-1][1]):                    
                     ax.set_xlabel("")
                     ax.set_title("")
                     zoom_start_transform = self.graphcoords[self.settings["zoom_start"]-self.get_start()]
                     zoom_end_transform = self.graphcoords[self.settings["zoom_end"]-self.get_start()]
                     ax.set_xlim(zoom_start_transform,zoom_end_transform)
                     
+                    if axi==0:  # for the zoom coverage plot
+                        # Annotate start and end x-coordinates for the first zoomed section
+                        ax.text(zoom_start_transform, ax.get_ylim()[0], f'{zoom_start_transform:.2f}', 
+                                verticalalignment='top', horizontalalignment='center', 
+                                color='black', fontsize=self.settings["font_size"])
+
+                        ax.text(zoom_end_transform, ax.get_ylim()[0], f'{zoom_end_transform:.2f}', 
+                                verticalalignment='top', horizontalalignment='center', 
+                                color='black', fontsize=self.settings["font_size"])
             
         if self.settings["zoom"]:
             self.build_zoom(fig,gs_subs[0][1],gs_subs[1][1])

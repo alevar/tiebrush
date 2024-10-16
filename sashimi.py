@@ -1102,11 +1102,11 @@ class Locus:
                     
                     if axi==0:  # for the zoom coverage plot
                         # Annotate start and end x-coordinates for the first zoomed section
-                        ax.text(zoom_start_transform, ax.get_ylim()[0], f'{zoom_start_transform:.2f}', 
+                        ax.text(zoom_start_transform, ax.get_ylim()[0], str(self.settings["zoom_start"]), 
                                 verticalalignment='top', horizontalalignment='center', 
                                 color='black', fontsize=self.settings["font_size"])
 
-                        ax.text(zoom_end_transform, ax.get_ylim()[0], f'{zoom_end_transform:.2f}', 
+                        ax.text(zoom_end_transform, ax.get_ylim()[0], str(self.settings["zoom_end"]), 
                                 verticalalignment='top', horizontalalignment='center', 
                                 color='black', fontsize=self.settings["font_size"])
             

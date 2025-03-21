@@ -110,6 +110,28 @@ else ()
     target_link_libraries(tiecov ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
 endif ()
 
+add_executable(tiecov_more src/tiecov_more.cpp
+        src/commons.h
+        src/GSam.cpp
+        src/GSam.h
+        src/tmerge.cpp
+        src/tmerge.h
+        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
+        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
+        ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.h
+        ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.cpp
+        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.h
+        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp)
+
+add_dependencies(tiecov_more htslib libBigWig)
+
+if (APPLE AND TIEBRUSH_STATIC_BUILD)
+    target_link_libraries(tiecov_more ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
+else ()
+    target_link_libraries(tiecov_more ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
+endif ()
+
+
 install(TARGETS tiebrush DESTINATION ${CMAKE_INSTALL_PREFIX})
 install(TARGETS tiecov DESTINATION ${CMAKE_INSTALL_PREFIX})
 install(PROGRAMS tiewrap.py DESTINATION ${CMAKE_INSTALL_PREFIX})

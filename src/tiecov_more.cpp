@@ -531,6 +531,9 @@ public:
                "\t" + std::to_string(get_unique_starts()) +
                "\t" + std::to_string(get_unique_ends()) +
                "\t" + std::to_string(get_frac_startsNends())+"\n";
+        if(!res.empty()){
+            res.pop_back();
+        }
         return res;
     }
 

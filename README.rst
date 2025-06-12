@@ -135,8 +135,6 @@ Custom SAM tags implemented
 2. **YX**:i:N stores the number of samples that have this alignment (sample count)
 3. **YD**:i:N keeps track of the maximum number of contiguous bases preceding the start of the read alignment in the samples(s) that it belongs to. In other words, if the current alignment is part of an exon-overlapping bundle (strand specific!), this value holds the maximum distance from the beginning of the bundle to the start of this alignment, across all samples having this alignment. If the alignment is not in a bundle (i.e. it is preceded by a uncovered region as it is not overlapped by any another alignment with a lower start position), in all the individual samples where that alignment is present, then the ``YD`` value is 0 and the tag is omitted from the output file produced by TieBrush. That means that all the alignments lacking a ``YD`` tag in the TieBrush output start at the very beginning of an exon-overlapping bundle (i.e. are not overlapped by a preceding alignment with a lower start coordinate).
 
-If either ``YC`` or ``YX`` tags are missing (i.e. ``GBamRecord::tag_int()`` call returns 0) then the alignment is unique (when ``YC`` is 0) or only one sample has it (if ``YX`` is 0). The actual count in such cases is 1.
-
 TieCov
 """"""
 

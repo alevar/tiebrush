@@ -481,8 +481,8 @@ void flushPData(GList<SPData>& spdlst){ //write spdata to outfile
 	  int64_t accYX=spd.accYX;
 	  int dSamples=spd.samples->count(); //this only has direct, non-TieBrush samples
 	  accYX+=dSamples;
-	  if (accYC>1) spd.r->add_int_tag("YC", accYC);
-	  if (accYX>1) spd.r->add_int_tag("YX", accYX);
+	  spd.r->add_int_tag("YC", (accYC == 1) ? 1 : accYC);
+	  spd.r->add_int_tag("YX", (accYX == 1) ? 1 : accYX);
 	  int dmax=spd.maxYD;
 	  for(int s=spd.samples->find_first();s>=0;s=spd.samples->find_next(s)) {
 	    	if (spd.tstrand=='+' || spd.tstrand=='.') {

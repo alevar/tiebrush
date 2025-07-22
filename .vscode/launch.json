@@ -1,46 +1,16 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Run tiebrush",
-            "type": "cppdbg",
+            "name": "Debug Rust tiebrush cov t1",
+            "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}\\tiebrush.exe",
-            "args": [],
-            "stopAtEntry": true,
+            "program": "${workspaceFolder}/target/debug/tiebrush",
+            "args": ["cov", "--coverage", "example/t1/t1.coverage.bedgraph", "--junctions", "example/t1/t1.junctions.bed", "example/t1/t1s0.bam", "example/t1/t1s1.bam"],
             "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": true,
-            "MIMode": "gdb",
-            "miDebuggerPath": "C:\\Prog\\msys2\\mingw64\\bin\\gdb.exe",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                }
-            ] /*,
-            "preLaunchTask": "C/C++: g++.exe build active file"
-            */
-        },
-        {
-            "name": "sashimi debug",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/sashimi.py",
-            "console": "integratedTerminal",
-            "args": [
-                "--title","RERE",
-                "--gtf","${workspaceFolder}/example_sashimi/AY69_E3p3_RERE.gtf",
-                "--cov","${workspaceFolder}/example_sashimi/AY69_E3p3_RERE.all.cov.bedgraph",
-                "-o","${workspaceFolder}/example_sashimi/AY69_E3p3_RERE.png",
-                "--intron_scale","10",
-                "--extend_by","7000",
-            ],
+            "stopOnEntry": false,
+            "sourceLanguages": ["rust"],
+            "preLaunchTask": "cargo build"
         }
-        
     ]
 }

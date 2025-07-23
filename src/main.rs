@@ -1,6 +1,7 @@
 mod brush;
 mod cov;
 mod samreader;
+mod commons;
 
 use clap::{Parser, Subcommand};
 use anyhow;

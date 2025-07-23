@@ -1,5 +1,6 @@
-use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView, header::HeaderRecord};
+use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView, header::HeaderRecord, Format};
 use std::fmt::{self, Display};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Strand {
@@ -106,4 +107,15 @@ pub fn get_strand(record: &Record) -> anyhow::Result<Strand> {
 
     // Default: unknown
     Ok(Strand::Unknown)
+}
+
+// return sam/bam/cram format from file extension
+pub fn get_format(path: &PathBuf) -> anyhow::Result<Format> {
+    let ext = path.extension().unwrap_or_default();
+    match ext.to_str().unwrap() {
+        "sam" => Ok(Format::Sam),
+        "bam" => Ok(Format::Bam),
+        "cram" => Ok(Format::Cram),
+        _ => anyhow::bail!("Unsupported file extension: {}", ext.to_string_lossy()),
+    }
 }

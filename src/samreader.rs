@@ -1,34 +1,33 @@
-use rust_htslib::bam::{self, Read, Record, Header, HeaderView};
+use rust_htslib::bam::{self, Read, Record, Header, HeaderView, header::HeaderRecord};
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use std::path::Path;
 use anyhow;
-use std::collections::HashMap;
 use crate::commons::*;
 
-struct SAMReaderRecord {
+struct TBSAMReaderRecord {
     record: Record,
     file_idx: usize,
 }
 
-impl PartialEq for SAMReaderRecord {
+impl PartialEq for TBSAMReaderRecord {
     fn eq(&self, other: &Self) -> bool { (self.record.tid(),self.record.pos()) == (other.record.tid(),other.record.pos()) }
 }
-impl Eq for SAMReaderRecord {}
-impl PartialOrd for SAMReaderRecord {
+impl Eq for TBSAMReaderRecord {}
+impl PartialOrd for TBSAMReaderRecord {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some((other.record.tid(),other.record.pos()).cmp(&(self.record.tid(),self.record.pos())))
     }
 }
-impl Ord for SAMReaderRecord {
+impl Ord for TBSAMReaderRecord {
     fn cmp(&self, other: &Self) -> Ordering {
         (other.record.tid(),other.record.pos()).cmp(&(self.record.tid(),self.record.pos()))
     }
 }
 
-pub struct SAMReader {
+pub struct TBSAMReader {
     readers: Vec<bam::Reader>,
-    heap: BinaryHeap<SAMReaderRecord>,
+    heap: BinaryHeap<TBSAMReaderRecord>,
     mheader: Header,
 }
 
@@ -36,7 +35,7 @@ fn is_coordinate_sorted(header: &HeaderView) -> anyhow::Result<bool> {
     let header = bam::Header::from_template(header);
     if let Some(hd_vec) = header.to_hashmap().get("HD") {
         if let Some(hd_fields) = hd_vec.first() {
-            if let Some(sort_order) = hd_fields.get("SO") {
+            if let Some(_) = hd_fields.get("SO") {
                 Ok(true)
             } else {
                 Ok(false)
@@ -66,7 +65,7 @@ fn header_sq_order_eq(header1: &HeaderView, header2: &HeaderView) -> bool {
     true
 }
 
-impl SAMReader {
+impl TBSAMReader {
     pub fn new<P: AsRef<Path>>(files: &[P]) -> anyhow::Result<Self> {
         let mut readers = Vec::new();
         let mut heap = BinaryHeap::new();
@@ -99,13 +98,24 @@ impl SAMReader {
             let mut record = Record::new();
             match reader.read(&mut record) {
                 Some(Ok(_)) => {
-                    heap.push(SAMReaderRecord { record, file_idx: i });
+                    heap.push(TBSAMReaderRecord { record, file_idx: i });
                 },
                 Some(Err(e)) => anyhow::bail!("Error reading file {:?}: {}", file.as_ref(), e),
                 None => {},
             }
             readers.push(reader);
+            // add CO line with sample data to the header
+            let comment_line = format!("SAMPLE:{}", file.as_ref().canonicalize().unwrap().to_string_lossy());
+            mheader.push_comment(comment_line.as_bytes());
         }
+
+        // add PG for TieBrush
+        let mut tb_pg_record = HeaderRecord::new("PG".as_bytes());
+        tb_pg_record.push_tag("ID".as_bytes(), "TieBrush");
+        tb_pg_record.push_tag("VN".as_bytes(), env!("CARGO_PKG_VERSION"));
+        let cmdline = std::env::args().collect::<Vec<_>>().join(" ");
+        tb_pg_record.push_tag("CL".as_bytes(), cmdline);    
+        mheader.push_record(&tb_pg_record);
 
         Ok(Self { readers, heap, mheader })
     }
@@ -115,7 +125,7 @@ impl SAMReader {
     }
 }
     
-impl Iterator for SAMReader {
+impl Iterator for TBSAMReader {
     type Item = Record;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(min_rec) = self.heap.pop() {
@@ -127,7 +137,7 @@ impl Iterator for SAMReader {
             let mut next_record = Record::new();
             match reader.read(&mut next_record) {
                 Some(Ok(_)) => {
-                    self.heap.push(SAMReaderRecord {
+                    self.heap.push(TBSAMReaderRecord {
                         record: next_record,
                         file_idx,
                     });

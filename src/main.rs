@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Brush(brush_ops ) => {
-            println!("Brush: {}", brush_ops.input.display());
+            brush::run(brush_ops)?;
         }
         Commands::Cov(cov_ops) => {
             cov::run(cov_ops)?;

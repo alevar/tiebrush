@@ -1,10 +1,22 @@
 use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView, header::HeaderRecord};
+use std::fmt::{self, Display};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Strand {
     Plus,
     Minus,
     Unknown,
+}
+
+// convert strand to char "+" or "-" or "."
+impl Display for Strand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", match self {
+            Strand::Plus => "+",
+            Strand::Minus => "-",
+            Strand::Unknown => ".",
+        })
+    }
 }
 
 pub fn get_yc_tag(record: &Record) -> anyhow::Result<Option<i32>> {
@@ -40,4 +52,54 @@ pub fn merge_headers(new_header: &Header, mheader: &mut Header) {
     for comment in new_header.comments() {
         mheader.push_comment(comment.as_bytes());
     }
+}
+
+pub fn get_strand(record: &Record) -> anyhow::Result<Strand> {
+    // Try XS tag first
+    match record.aux(b"XS") {
+        Ok(xs_val) => match xs_val {
+            Aux::Char(c) => {
+                match c {
+                    b'+' => {return Ok(Strand::Plus)},
+                    b'-' => {return Ok(Strand::Minus)},
+                    _ => {return Ok(Strand::Unknown)},
+                }
+            },
+            _ => {anyhow::bail!("XS tag is not a character.")},
+        },
+        _ => {},
+    }
+
+    // Try minimap2's "ts" tag
+    let is_reverse = record.is_reverse();
+    match record.aux(b"ts") {
+        Ok(ts_val) => match ts_val {
+            Aux::Char(c) => {
+                match c {
+                    b'+' => {
+                        if is_reverse {
+                            return Ok(Strand::Minus)
+                        }
+                        else {
+                            return Ok(Strand::Plus)
+                        }
+                    },
+                    b'-' => {
+                        if is_reverse {
+                            return Ok(Strand::Plus)
+                        }
+                        else {
+                            return Ok(Strand::Minus)
+                        }
+                    },
+                    _ => {return Ok(Strand::Unknown)},
+                }
+            },
+            _ => {anyhow::bail!("ts tag is not a character.")},
+        },
+        _ => {},
+    }
+
+    // Default: unknown
+    Ok(Strand::Unknown)
 }

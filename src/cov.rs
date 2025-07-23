@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::io::{BufWriter, Write};
 use clap::{Args, ArgGroup};
 use std::collections::{HashMap, hash_map::Entry};
-use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView};
+use rust_htslib::bam::{Record, HeaderView, record::Cigar};
 use rust_htslib::bam::ext::BamRecordExtensions;
 
 #[derive(Args, Debug)]
@@ -28,6 +28,15 @@ pub struct CovArgs {
     /// One or more alignment files in SAM/BAM/CRAM format.
     #[arg(required = true)]
     pub input_alignments: Vec<PathBuf>,
+    /// Exclude supplementary alignments. Supplementary alignments are included by default.
+    #[arg(short='S', long)]
+    pub exclude_supplementary: bool,
+    /// Include only flags. Reads with the provided bits set in the flag field are included.
+    #[arg(short='f', long)]
+    pub include_flags: Option<u16>,
+    /// Exclude flags. Reads with the provided bits set in the flag field are excluded.
+    #[arg(short='F', long)]
+    pub exclude_flags: Option<u16>,
 }
 
 /// JuncMat is a matrix of junction data for a single (seqid, strand).
@@ -56,12 +65,16 @@ impl JuncMat {
         self.data.get_mut(&(strand, start, end))
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     /// Increment the value for a given junction, or insert with 1 if not present (for counts).
-    pub fn increment(&mut self, strand: Strand, start: i64, end: i64)
+    pub fn increment(&mut self, strand: Strand, start: i64, end: i64, val: u64)
     {
         match self.data.entry((strand, start, end)) {
-            Entry::Occupied(mut e) => *e.get_mut() += 1,
-            Entry::Vacant(e) => { e.insert(1); },
+            Entry::Occupied(mut e) => *e.get_mut() += val,
+            Entry::Vacant(e) => { e.insert(val); },
         }
     }
 }
@@ -148,6 +161,32 @@ impl TBCov {
             self.end = record.reference_end();
         }
 
+        // iterate using cigar operations
+        let mut ref_pos = record.pos();
+        for op in record.cigar().iter() {
+            match op {
+                Cigar::Match(len) | Cigar::Equal(len) | Cigar::Diff(len) => {
+                    for _ in 0..*len {
+                        self.cov[(ref_pos - self.start) as usize] += yc;
+                        ref_pos += 1;
+                    }
+                }
+                Cigar::Ins(len) | Cigar::SoftClip(len) => {
+                }
+                Cigar::Del(len) => {
+                    ref_pos += *len as i64;
+                }
+                Cigar::RefSkip(len) => {
+                    // add to junc mat
+                    let strand = get_strand(&record)?;
+                    self.junc.increment(strand, ref_pos, ref_pos + *len as i64, yc.try_into().unwrap());
+                    ref_pos += *len as i64;
+                }
+                Cigar::HardClip(_) => {} // no advance
+                Cigar::Pad(_) => panic!("Padding (Cigar::Pad) is not supported."), //padding is only used for multiple sequence alignment
+            }
+        }
+
         for pos in record.reference_positions() {
             let vec_pos = (pos - self.start) as usize;
             self.cov[vec_pos] += yc;
@@ -167,6 +206,7 @@ pub struct CovCMD {
     cov_args: CovArgs,
     cov_writer: Option<BufWriter<File>>,
     junc_writer: Option<BufWriter<File>>,
+    junc_counter: u64, // used for naming junctions
 }
 
 impl CovCMD {
@@ -188,7 +228,9 @@ impl CovCMD {
         };
         let junc_writer = match args.junctions {
             Some(ref junc_path) => {
-                Some(BufWriter::new(File::create(junc_path)?))
+                let mut writer = BufWriter::new(File::create(junc_path)?);
+                writeln!(writer, "track name=junctions")?;
+                Some(writer)
             },
             None => None,
         };
@@ -197,6 +239,7 @@ impl CovCMD {
             cov_args: args,
             cov_writer,
             junc_writer,
+            junc_counter: 1,
         })
     }
 
@@ -232,10 +275,26 @@ impl CovCMD {
         Ok(())
     }
 
-    pub fn flush_junc(&self, tbcov: &TBCov, header: &HeaderView) -> anyhow::Result<()> {
-        match self.cov_args.junctions {
-            Some(ref junc_path) => {
-                // println!("junc: {:?}", tbcov.junc);
+    pub fn flush_junc(&mut self, tbcov: &TBCov, header: &HeaderView) -> anyhow::Result<()> {
+        match self.junc_writer {
+            Some(ref mut writer) => {
+                if tbcov.junc.is_empty() {
+                    return Ok(());
+                }
+
+                let mut entries: Vec<_> = tbcov.junc.data.iter().collect();
+                entries.sort_by(|a, b| {
+                    let ((_, start_a, end_a), _) = a;
+                    let ((_, start_b, end_b), _) = b;
+                    start_a.cmp(start_b).then(end_a.cmp(end_b))
+                });
+
+                for ((strand, start, end), count) in entries {
+                    let seqname = std::str::from_utf8(header.tid2name(tbcov.seqid as u32)).unwrap();
+                    let junc_name = format!("JUNC{:08}", self.junc_counter);
+                    writeln!(writer, "{}\t{}\t{}\t{}\t{}\t{}", seqname, start, end, junc_name, count, strand)?;
+                    self.junc_counter += 1;
+                }
             }
             None => {}
         }

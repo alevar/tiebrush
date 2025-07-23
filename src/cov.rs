@@ -11,8 +11,8 @@ use rust_htslib::bam::ext::BamRecordExtensions;
 
 #[derive(Args, Debug)]
 #[command(group(
-    ArgGroup::new("inputs")
-    .multiple(true)
+    ArgGroup::new("outputs")
+    .required(true)
         .args(["coverage", "junctions"])
 ))]
 pub struct CovArgs {
@@ -191,9 +191,11 @@ impl TBCov {
             }
         }
 
-        for pos in record.reference_positions() {
-            let vec_pos = (pos - self.start) as usize;
-            self.cov[vec_pos] += yc;
+        if self.store_cov {
+            for pos in record.reference_positions() {
+                let vec_pos = (pos - self.start) as usize;
+                self.cov[vec_pos] += yc;
+            }
         }
         
         Ok(())

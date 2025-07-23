@@ -19,6 +19,10 @@ impl Display for Strand {
     }
 }
 
+pub fn flags_set(record: &Record, flags: u16) -> bool {
+    (record.flags() & flags) == flags
+}
+
 pub fn get_yc_tag(record: &Record) -> anyhow::Result<Option<i32>> {
     match record.aux(b"YC") {
         Ok(yc_val) => match yc_val {

@@ -154,7 +154,7 @@ impl TBCov {
             println!("yc: {}", yc);
         }
 
-        if record.reference_end() > self.end {
+        if record.reference_end() > self.end && self.store_cov {
             // extend the cov vec
             let extend_len = (record.reference_end() - self.end) as usize;
             self.cov.extend(vec![0; extend_len]);
@@ -167,7 +167,9 @@ impl TBCov {
             match op {
                 Cigar::Match(len) | Cigar::Equal(len) | Cigar::Diff(len) => {
                     for _ in 0..*len {
-                        self.cov[(ref_pos - self.start) as usize] += yc;
+                        if self.store_cov {
+                            self.cov[(ref_pos - self.start) as usize] += yc;
+                        }
                         ref_pos += 1;
                     }
                 }
@@ -178,8 +180,10 @@ impl TBCov {
                 }
                 Cigar::RefSkip(len) => {
                     // add to junc mat
-                    let strand = get_strand(&record)?;
-                    self.junc.increment(strand, ref_pos, ref_pos + *len as i64, yc.try_into().unwrap());
+                    if self.store_junc {
+                        let strand = get_strand(&record)?;
+                        self.junc.increment(strand, ref_pos, ref_pos + *len as i64, yc.try_into().unwrap());
+                    }
                     ref_pos += *len as i64;
                 }
                 Cigar::HardClip(_) => {} // no advance
@@ -307,30 +311,54 @@ impl CovCMD {
         let header_view = HeaderView::from_header(header);
         // get first record;
         let mut tbcov = match sam_reader.next() {
-            Some(record) => TBCov::new_from_record(&record),
+            Some(record) => {
+                let mut tbcov = TBCov::new_from_record(&record);
+                tbcov.set_store_cov(self.cov_args.coverage.is_some());
+                tbcov.set_store_junc(self.cov_args.junctions.is_some());
+                tbcov
+            },
             None => {
                 anyhow::bail!("No records found in the input alignments");
             }
         };
 
-        // need to somehow map from seqid to seqname 
-        
         for record in sam_reader {
             if record.is_unmapped() {
                 continue;
             }
 
+            // check flags
+            if self.cov_args.exclude_supplementary && record.is_supplementary() {
+                continue;
+            }
+            if self.cov_args.include_flags.is_some() && !flags_set(&record, self.cov_args.include_flags.unwrap()) {
+                continue;
+            }
+            if self.cov_args.exclude_flags.is_some() && flags_set(&record, self.cov_args.exclude_flags.unwrap()) {
+                continue;
+            }
+
             if record.tid() != tbcov.seqid || record.pos() > tbcov.end {
-                self.flush_cov(&tbcov, &header_view)?;
-                self.flush_junc(&tbcov, &header_view)?;
+                if self.cov_args.coverage.is_some() {
+                    self.flush_cov(&tbcov, &header_view)?;
+                }
+                if self.cov_args.junctions.is_some() {
+                    self.flush_junc(&tbcov, &header_view)?;
+                }
                 tbcov = TBCov::new_from_record(&record);
+                tbcov.set_store_cov(self.cov_args.coverage.is_some());
+                tbcov.set_store_junc(self.cov_args.junctions.is_some());
             }
             else {
                 tbcov.add_record(&record)?;
             }
         }
-        self.flush_cov(&tbcov, &header_view)?;
-        self.flush_junc(&tbcov, &header_view)?;
+        if self.cov_args.coverage.is_some() {
+            self.flush_cov(&tbcov, &header_view)?;
+        }
+        if self.cov_args.junctions.is_some() {
+            self.flush_junc(&tbcov, &header_view)?;
+        }
 
         Ok(())
     }

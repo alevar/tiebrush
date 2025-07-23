@@ -1,8 +1,10 @@
-use rust_htslib::bam::{self, Read, Record};
+use rust_htslib::bam::{self, Read, Record, Header, HeaderView};
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use std::path::Path;
 use anyhow;
+use std::collections::HashMap;
+use crate::commons::*;
 
 struct SAMReaderRecord {
     record: Record,
@@ -10,27 +12,28 @@ struct SAMReaderRecord {
 }
 
 impl PartialEq for SAMReaderRecord {
-    fn eq(&self, other: &Self) -> bool { self.record.pos() == other.record.pos() }
+    fn eq(&self, other: &Self) -> bool { (self.record.tid(),self.record.pos()) == (other.record.tid(),other.record.pos()) }
 }
 impl Eq for SAMReaderRecord {}
 impl PartialOrd for SAMReaderRecord {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(other.record.pos().cmp(&self.record.pos()))
+        Some((other.record.tid(),other.record.pos()).cmp(&(self.record.tid(),self.record.pos())))
     }
 }
 impl Ord for SAMReaderRecord {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.record.pos().cmp(&self.record.pos())
+        (other.record.tid(),other.record.pos()).cmp(&(self.record.tid(),self.record.pos()))
     }
 }
 
 pub struct SAMReader {
     readers: Vec<bam::Reader>,
     heap: BinaryHeap<SAMReaderRecord>,
+    mheader: Header,
 }
 
-fn is_coordinate_sorted(reader: &bam::Reader) -> anyhow::Result<bool> {
-    let header = bam::Header::from_template(reader.header());
+fn is_coordinate_sorted(header: &HeaderView) -> anyhow::Result<bool> {
+    let header = bam::Header::from_template(header);
     if let Some(hd_vec) = header.to_hashmap().get("HD") {
         if let Some(hd_fields) = hd_vec.first() {
             if let Some(sort_order) = hd_fields.get("SO") {
@@ -48,16 +51,51 @@ fn is_coordinate_sorted(reader: &bam::Reader) -> anyhow::Result<bool> {
     }
 }
 
+fn header_sq_order_eq(header1: &HeaderView, header2: &HeaderView) -> bool {
+    if header1.target_count() != header2.target_count() {
+        return false;
+    }
+    for i in 0..header1.target_count() {
+        if header1.tid2name(i) != header2.tid2name(i) {
+            return false;
+        }
+        if header1.target_len(i).unwrap() != header2.target_len(i).unwrap() {
+            return false;
+        }
+    }
+    true
+}
+
 impl SAMReader {
     pub fn new<P: AsRef<Path>>(files: &[P]) -> anyhow::Result<Self> {
         let mut readers = Vec::new();
         let mut heap = BinaryHeap::new();
+        let mut ref_header: Option<HeaderView> = None;
+
+        let mut mheader = Header::new();
 
         for (i, file) in files.iter().enumerate() {
             let mut reader = bam::Reader::from_path(file)?;
-            if !is_coordinate_sorted(&reader)? {
-                anyhow::bail!("File {:?} is not coordinate sorted", file.as_ref());
+            
+            // check header correctness
+            if let Some(ref ref_hdr) = ref_header {
+                let new_hdr = reader.header().clone();
+                if !is_coordinate_sorted(&new_hdr)? {
+                    anyhow::bail!("File {:?} is not coordinate sorted", file.as_ref());
+                }
+                if !header_sq_order_eq(ref_hdr, &new_hdr) {
+                    anyhow::bail!("File {:?} has different reference sequence order", file.as_ref());
+                }
+                // merge headers
+                // for every header line type (PG, RG, etc), except SQ and HD lines
+                // add them to the merged header
+                let new_header = Header::from_template(&new_hdr);
+                merge_headers( &new_header, &mut mheader);
+            } else {
+                ref_header = Some(reader.header().clone());
+                mheader = Header::from_template(&ref_header.clone().unwrap());
             }
+
             let mut record = Record::new();
             match reader.read(&mut record) {
                 Some(Ok(_)) => {
@@ -69,10 +107,14 @@ impl SAMReader {
             readers.push(reader);
         }
 
-        Ok(Self { readers, heap })
+        Ok(Self { readers, heap, mheader })
+    }
+
+    pub fn get_header(&self) -> &Header {
+        &self.mheader
     }
 }
-
+    
 impl Iterator for SAMReader {
     type Item = Record;
     fn next(&mut self) -> Option<Self::Item> {

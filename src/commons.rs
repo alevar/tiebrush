@@ -1,4 +1,4 @@
-use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView, header::HeaderRecord, Format};
+use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView, header::HeaderRecord, Format, record::Cigar};
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 
@@ -34,6 +34,21 @@ pub fn get_yc_tag(record: &Record) -> anyhow::Result<Option<i32>> {
             Aux::U16(val) => Ok(Some(val as i32)),
             Aux::U32(val) => Ok(Some(val as i32)),
             _ => anyhow::bail!("Value for YC tag is not an integer."),
+        },
+        _ => Ok(None),
+    }
+}
+
+pub fn get_nh_tag(record: &Record) -> anyhow::Result<Option<u16>> {
+    match record.aux(b"NH") {
+        Ok(nh_val) => match nh_val {
+            Aux::I8(val) => Ok(Some(val as u16)),
+            Aux::I16(val) => Ok(Some(val as u16)),
+            Aux::I32(val) => Ok(Some(val as u16)),
+            Aux::U8(val) => Ok(Some(val as u16)),
+            Aux::U16(val) => Ok(Some(val as u16)),
+            Aux::U32(val) => Ok(Some(val as u16)),
+            _ => anyhow::bail!("Value for NH tag is not an integer."),
         },
         _ => Ok(None),
     }
@@ -117,5 +132,19 @@ pub fn get_format(path: &PathBuf) -> anyhow::Result<Format> {
         "bam" => Ok(Format::Bam),
         "cram" => Ok(Format::Cram),
         _ => anyhow::bail!("Unsupported file extension: {}", ext.to_string_lossy()),
+    }
+}
+
+pub fn encode_cigar(cigar: &Cigar) -> u32 {
+    match cigar {
+        Cigar::Match(len) => len << 4, // | 0,
+        Cigar::Ins(len) => (len << 4) | 1,
+        Cigar::Del(len) => (len << 4) | 2,
+        Cigar::RefSkip(len) => (len << 4) | 3,
+        Cigar::SoftClip(len) => (len << 4) | 4,
+        Cigar::HardClip(len) => (len << 4) | 5,
+        Cigar::Pad(len) => (len << 4) | 6,
+        Cigar::Equal(len) => (len << 4) | 7,
+        Cigar::Diff(len) => (len << 4) | 8,
     }
 }

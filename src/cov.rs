@@ -1,4 +1,4 @@
-use crate::samreader::SAMReader;
+use crate::samreader::TBSAMReader;
 use crate::commons::*;
 
 use std::fs::File;
@@ -6,8 +6,7 @@ use std::path::PathBuf;
 use std::io::{BufWriter, Write};
 use clap::{Args, ArgGroup};
 use std::collections::{HashMap, hash_map::Entry};
-use rust_htslib::bam::{Record, HeaderView, record::Cigar};
-use rust_htslib::bam::ext::BamRecordExtensions;
+use rust_htslib::bam::{Record, HeaderView, record::Cigar, ext::BamRecordExtensions};
 
 #[derive(Args, Debug)]
 #[command(group(
@@ -308,7 +307,7 @@ impl CovCMD {
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
-        let mut sam_reader = SAMReader::new(&self.cov_args.input_alignments)?;
+        let mut sam_reader = TBSAMReader::new(&self.cov_args.input_alignments)?;
         let header = sam_reader.get_header();
         let header_view = HeaderView::from_header(header);
         // get first record;

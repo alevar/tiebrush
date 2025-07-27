@@ -1,4 +1,4 @@
-use crate::samreader::TBSAMReader;
+use crate::samreader::{TBSAMReader, TBSAMReaderRecord};
 use crate::commons::*;
 
 use std::{path::PathBuf, vec};
@@ -87,7 +87,9 @@ struct ClipReadKey {
 struct ExonReadKey {
     tid: i32,
     strand: Strand,
-    segments: Vec<(i64, i64)>,
+    start: i64,
+    end: i64,
+    introns: Vec<(i64, i64)>,
 }
 
 struct FullStrat;
@@ -102,7 +104,7 @@ impl ReadKeyStrat for FullStrat {
         Ok(Self::Key {
             tid: record.tid(),
             start: record.pos(),
-            end: record.cigar().end_pos(),
+            end: record.reference_end(),
             strand: get_strand(record)?,
             cigar,
         })
@@ -120,7 +122,7 @@ impl ReadKeyStrat for ClipStrat {
         Ok(Self::Key {
             tid: record.tid(),
             start: record.pos(),
-            end: record.cigar().end_pos(),
+            end: record.reference_end(),
             strand: get_strand(record)?,
             cigar,
         })
@@ -131,11 +133,15 @@ impl ReadKeyStrat for ExonStrat {
     type Key = ExonReadKey;
 
     fn create_key(&self, record: &Record) -> anyhow::Result<Self::Key> {
-        let segments = vec![];
+        let mut introns: Vec<(i64, i64)> = record.introns()
+        .map(|arr|(arr[0], arr[1]))
+        .collect();
         Ok(Self::Key {
             tid: record.tid(),
             strand: get_strand(record)?,
-            segments,
+            start: record.pos(),
+            end: record.reference_end(),
+            introns,
         })
     }
 }
@@ -148,11 +154,11 @@ enum ReadKey {
 }
 
 impl ReadKey {
-    fn create_key(record: &Record, cmp_strat: CmpStrat) -> anyhow::Result<Self> {
+    fn create_key(tb_record: &TBSAMReaderRecord, cmp_strat: CmpStrat) -> anyhow::Result<Self> {
         match cmp_strat {
-            CmpStrat::Full => FullStrat.create_key(record).map(ReadKey::Full),
-            CmpStrat::Clip => ClipStrat.create_key(record).map(ReadKey::Clip),
-            CmpStrat::Exon => ExonStrat.create_key(record).map(ReadKey::Exon),
+            CmpStrat::Full => FullStrat.create_key(tb_record.record()).map(ReadKey::Full),
+            CmpStrat::Clip => ClipStrat.create_key(tb_record.record()).map(ReadKey::Clip),
+            CmpStrat::Exon => ExonStrat.create_key(tb_record.record()).map(ReadKey::Exon),
         }
     }
 }
@@ -160,21 +166,34 @@ impl ReadKey {
 #[derive(Debug)]
 struct MergedReads {
     representative: Record,
-    dup_count: u32,
-    sample_count: u32,
+    samples: Vec<bool>,
+    acc_yc: u32,
+    acc_yx: u32,
 }
 
 impl MergedReads {
-    fn new(record: Record) -> Self {
+    fn new(tb_record: &TBSAMReaderRecord, num_samples: usize) -> Self {
+        let yc = get_yc_tag(tb_record.record()).expect("Failed to read YC tag").unwrap_or(1) as u32;
+        let yx = get_yx_tag(tb_record.record()).expect("Failed to read YX tag").unwrap_or(1) as u32;
+        let sample_idx = tb_record.file_idx();
+        let mut samples = vec![false; num_samples];
+        samples[sample_idx] = true;
         Self {
-            representative: record,
-            dup_count: 1,
-            sample_count: 1,
+            representative: tb_record.record().clone(),
+            samples,
+            acc_yc: yc,
+            acc_yx: yx,
         }
     }
 
-    fn add_duplicate(&mut self) {
-        self.dup_count += 1;
+    fn add_duplicate(&mut self, tb_record: &TBSAMReaderRecord) {
+        let yc = get_yc_tag(tb_record.record()).expect("Failed to read YC tag").unwrap_or(1) as u32;
+        let yx = get_yx_tag(tb_record.record()).expect("Failed to read YX tag").unwrap_or(1) as u32;
+        let sample_idx = tb_record.file_idx();
+
+        self.samples[sample_idx] = true;
+        self.acc_yc += yc;
+        self.acc_yx += yx;
     }
 }
 
@@ -233,27 +252,27 @@ impl BrushCMD {
         let writer = Writer::from_path(tb_path, header, self.tb_format)?;
         self.tb_writer = Some(writer);
 
-        for record in sam_reader {
+        for tb_record in sam_reader {
             // check if the record passes the options
-            if !self.brush_args.keep_supplementary && record.is_supplementary() {
+            if !self.brush_args.keep_supplementary && tb_record.record().is_supplementary() {
                 continue;
             }
-            if !self.brush_args.keep_unmapped && record.is_unmapped() {
+            if !self.brush_args.keep_unmapped && tb_record.record().is_unmapped() {
                 continue;
             }
-            if record.mapq() < self.brush_args.min_qual.unwrap_or(0) {
+            if tb_record.record().mapq() < self.brush_args.min_qual.unwrap_or(0) {
                 continue;
             }
-            if get_nh_tag(&record)?.unwrap_or(1) > self.brush_args.max_nh.unwrap_or(u16::MAX) {
+            if get_nh_tag(&tb_record.record())?.unwrap_or(1) > self.brush_args.max_nh.unwrap_or(u16::MAX) {
                 continue;
             }
-            if self.brush_args.include_flags.is_some() && !flags_set(&record, self.brush_args.include_flags.unwrap()) {
-                self.tb_writer.as_mut().unwrap().write(&record)?;
+            if self.brush_args.include_flags.is_some() && !flags_set(&tb_record.record(), self.brush_args.include_flags.unwrap()) {
+                self.tb_writer.as_mut().unwrap().write(&tb_record.record())?;
                 continue;
             }
 
             // everything else can be processed via merging
-            self.process_record(record)?;
+            self.process_record(tb_record)?;
 
         }
         self.flush_current_reads()?;
@@ -261,8 +280,8 @@ impl BrushCMD {
         Ok(())
     }
 
-    fn process_record(&mut self, record: Record) -> anyhow::Result<()> {
-        let current_pos = (record.tid(), record.pos());
+    fn process_record(&mut self, record: TBSAMReaderRecord) -> anyhow::Result<()> {
+        let current_pos = (record.record().tid(), record.record().pos());
         
         match self.last_position {
             Some((tid, pos)) if tid == current_pos.0 && pos == current_pos.1 => {},
@@ -275,9 +294,9 @@ impl BrushCMD {
         
         let read_key = ReadKey::create_key(&record,self.cmp_strat)?;
         if let Some(grouped_reads) = self.current_reads.get_mut(&read_key) {
-            grouped_reads.add_duplicate();
+            grouped_reads.add_duplicate(&record);
         } else {
-            self.current_reads.insert(read_key, MergedReads::new(record));
+            self.current_reads.insert(read_key, MergedReads::new(&record, self.brush_args.input_alignments.len()));
         }
         
         Ok(())
@@ -285,9 +304,8 @@ impl BrushCMD {
 
     fn flush_current_reads(&mut self) -> anyhow::Result<()> {
         for (_, mut grouped_reads) in self.current_reads.drain() {
-            if grouped_reads.dup_count > 1 {
-                grouped_reads.representative.push_aux(b"YC", rust_htslib::bam::record::Aux::I32(grouped_reads.dup_count as i32))?;
-            }
+            grouped_reads.representative.push_aux(b"YC", rust_htslib::bam::record::Aux::I32(grouped_reads.acc_yc as i32))?;
+            grouped_reads.representative.push_aux(b"YX",rust_htslib::bam::record::Aux::I32(grouped_reads.samples.iter().filter(|&&s| s).count() as i32))?;
             
             self.tb_writer.as_mut().unwrap().write(&grouped_reads.representative)?;
         }
@@ -324,7 +342,7 @@ mod tests {
         header
     }
 
-    fn create_test_record(tid: i32, pos: i64, cigar: Vec<Cigar>, strand: bool) -> Record {
+    fn create_test_record(read_name: &[u8], tid: i32, pos: i64, cigar: Vec<Cigar>, strand: bool) -> Record {
         let header = create_test_header();
         let mut record = Record::new();
         
@@ -334,7 +352,7 @@ mod tests {
         let seq_len = 100;
         let seq = vec![b'A'; seq_len];
         let qual = vec![30u8; seq_len];
-        record.set(b"test_read", Some(&CigarString(cigar)), &seq, &qual);
+        record.set(read_name, Some(&CigarString(cigar)), &seq, &qual);
         
         record.set_mapq(60);
         
@@ -354,10 +372,13 @@ mod tests {
     #[test]
     fn test_full_strategy_same_reads() {
         let strat = FullStrat;
-        let cigar = vec![Cigar::Match(50), Cigar::SoftClip(10)];
+        let cigar = vec![
+            Cigar::Match(50), 
+            Cigar::SoftClip(10)
+        ];
         
-        let record1 = create_test_record(0, 100, cigar.clone(), true);
-        let record2 = create_test_record(0, 100, cigar.clone(), true);
+        let record1 = create_test_record(b"r1",0, 100, cigar.clone(), true);
+        let record2 = create_test_record(b"r2",0, 100, cigar.clone(), true);
         
         let key1 = strat.create_key(&record1).unwrap();
         let key2 = strat.create_key(&record2).unwrap();
@@ -368,14 +389,70 @@ mod tests {
     #[test]
     fn test_full_strategy_different_positions() {
         let strat = FullStrat;
-        let cigar = vec![Cigar::Match(50), Cigar::SoftClip(10)];
+        let cigar = vec![
+            Cigar::Match(50), 
+            Cigar::SoftClip(10)
+        ];
         
-        let record1 = create_test_record(0, 100, cigar.clone(), true);
-        let record2 = create_test_record(0, 200, cigar.clone(), true);
+        let record1 = create_test_record(b"r1",0, 100, cigar.clone(), true);
+        let record2 = create_test_record(b"r2",0, 200, cigar.clone(), true);
         
         let key1 = strat.create_key(&record1).unwrap();
         let key2 = strat.create_key(&record2).unwrap();
         
         assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn test_merged_reads_fresh_records() {
+        // Create mock TBSAMReaderRecord
+        let record1 = create_test_record(b"r1",0, 100, vec![Cigar::Match(50)], true);
+        let record2 = create_test_record(b"r2",0, 100, vec![Cigar::Match(50)], true);
+    
+        let tb_rec1 = TBSAMReaderRecord::new(record1, 0);
+        let tb_rec2 = TBSAMReaderRecord::new(record2, 1);
+
+        let num_samples = 2;
+
+        let mut merged_reads = MergedReads::new(&tb_rec1, num_samples);
+        assert_eq!(merged_reads.samples.len(), num_samples);
+        assert!(merged_reads.samples[0]);
+        assert!(!merged_reads.samples[1]);
+        assert_eq!(merged_reads.acc_yc, 1);
+        assert_eq!(merged_reads.acc_yx, 1);
+        
+        merged_reads.add_duplicate(&tb_rec2);
+        assert_eq!(merged_reads.samples.len(), num_samples);
+        assert!(merged_reads.samples[0]);
+        assert!(merged_reads.samples[1]);
+        assert_eq!(merged_reads.acc_yc, 2);
+        assert_eq!(merged_reads.acc_yx, 2);
+    }
+
+    #[test]
+    fn test_merged_reads_with_existing_tags() {
+        let record1 = create_test_record(b"r1", 0, 100, vec![Cigar::Match(50)], true);
+        let mut record2 = create_test_record(b"r2", 0, 100, vec![Cigar::Match(50)], true);
+        record2.push_aux(b"YC", rust_htslib::bam::record::Aux::I32(4)).unwrap();
+        record2.push_aux(b"YX", rust_htslib::bam::record::Aux::I32(2)).unwrap();
+
+        let tb_rec1 = TBSAMReaderRecord::new(record1, 0);
+        let tb_rec2 = TBSAMReaderRecord::new(record2, 1);
+
+        let num_samples = 2;
+
+        let mut merged_reads = MergedReads::new(&tb_rec1, num_samples);
+        assert_eq!(merged_reads.samples.len(), num_samples);
+        assert!(merged_reads.samples[0]);
+        assert!(!merged_reads.samples[1]);
+        assert_eq!(merged_reads.acc_yc, 1);
+        assert_eq!(merged_reads.acc_yx, 1);
+
+        merged_reads.add_duplicate(&tb_rec2);
+        assert_eq!(merged_reads.samples.len(), num_samples);
+        assert!(merged_reads.samples[0]);
+        assert!(merged_reads.samples[1]);
+        assert_eq!(merged_reads.acc_yc, 5);
+        assert_eq!(merged_reads.acc_yx, 3);
     }
 }

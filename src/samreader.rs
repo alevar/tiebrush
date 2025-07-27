@@ -5,9 +5,22 @@ use std::path::Path;
 use anyhow;
 use crate::commons::*;
 
-struct TBSAMReaderRecord {
+#[derive(Debug, Clone)]
+pub struct TBSAMReaderRecord {
     record: Record,
     file_idx: usize,
+}
+
+impl TBSAMReaderRecord {
+    pub fn new(record: Record, file_idx: usize) -> Self {
+        TBSAMReaderRecord { record, file_idx }
+    }
+    pub fn record(&self) -> &Record {
+        &self.record
+    }
+    pub fn file_idx(&self) -> usize {
+        self.file_idx
+    }
 }
 
 impl PartialEq for TBSAMReaderRecord {
@@ -126,11 +139,11 @@ impl TBSAMReader {
 }
     
 impl Iterator for TBSAMReader {
-    type Item = Record;
+    type Item = TBSAMReaderRecord;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(min_rec) = self.heap.pop() {
             let file_idx = min_rec.file_idx;
-            let result = min_rec.record.clone();
+            let result = min_rec.clone();
 
             // Try to read next record from the same file
             let reader = &mut self.readers[file_idx];

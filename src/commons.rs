@@ -39,6 +39,21 @@ pub fn get_yc_tag(record: &Record) -> anyhow::Result<Option<i32>> {
     }
 }
 
+pub fn get_yx_tag(record: &Record) -> anyhow::Result<Option<i32>> {
+    match record.aux(b"YX") {
+        Ok(yx_val) => match yx_val {
+            Aux::I8(val) => Ok(Some(val as i32)),
+            Aux::I16(val) => Ok(Some(val as i32)),
+            Aux::I32(val) => Ok(Some(val as i32)),
+            Aux::U8(val) => Ok(Some(val as i32)),
+            Aux::U16(val) => Ok(Some(val as i32)),
+            Aux::U32(val) => Ok(Some(val as i32)),
+            _ => anyhow::bail!("Value for YX tag is not an integer."),
+        },
+        _ => Ok(None),
+    }
+}
+
 pub fn get_nh_tag(record: &Record) -> anyhow::Result<Option<u16>> {
     match record.aux(b"NH") {
         Ok(nh_val) => match nh_val {

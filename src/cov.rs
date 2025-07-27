@@ -5,6 +5,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::io::{BufWriter, Write};
 use clap::{Args, ArgGroup};
+use rust_htslib::bam::record;
 use std::collections::{HashMap, hash_map::Entry};
 use rust_htslib::bam::{Record, HeaderView, record::Cigar, ext::BamRecordExtensions};
 
@@ -312,8 +313,8 @@ impl CovCMD {
         let header_view = HeaderView::from_header(header);
         // get first record;
         let mut tbcov = match sam_reader.next() {
-            Some(record) => {
-                let mut tbcov = TBCov::new_from_record(&record);
+            Some(tb_record) => {
+                let mut tbcov = TBCov::new_from_record(&tb_record.record());
                 tbcov.set_store_cov(self.cov_args.coverage.is_some());
                 tbcov.set_store_junc(self.cov_args.junctions.is_some());
                 tbcov
@@ -323,7 +324,8 @@ impl CovCMD {
             }
         };
 
-        for record in sam_reader {
+        for tb_record in sam_reader {
+            let record = tb_record.record();
             if record.is_unmapped() {
                 continue;
             }

@@ -6,6 +6,34 @@ use std::collections::HashMap;
 use clap::{Args, ArgGroup};
 use rust_htslib::bam::{Record, record::Cigar, Format, ext::BamRecordExtensions, Writer};
 
+#[derive(Debug, Default)]
+pub struct TBStats {
+    pub total_input_reads: u64,
+    pub filtered_reads: u64,
+    pub processed_reads: u64,
+    
+    pub total_output_reads: u64,
+}
+
+impl TBStats {
+    fn compression_ratio(&self) -> f64 {
+        if self.total_output_reads == 0 {
+            0.0
+        } else {
+            (self.processed_reads as f64) / (self.total_output_reads as f64)
+        }
+    }
+    
+    fn print_summary(&self) {
+        println!("=== TieBrush Deduplication Summary ===");
+        println!("Total input reads: {}", self.total_input_reads);
+        println!("Filtered reads: {}", self.filtered_reads);
+        println!("Input reads processed: {}", self.processed_reads);
+        println!("Output reads written: {}", self.total_output_reads);
+        println!("Compression ratio: {:.2}x", self.compression_ratio());
+    }
+}
+
 #[derive(Args, Debug)]
 #[command(group(
     ArgGroup::new("cmp_group")
@@ -205,6 +233,8 @@ pub struct BrushCMD {
 
     current_reads: HashMap<ReadKey, MergedReads>,
     last_position: Option<(i32, i64)>, // (tid, pos)
+
+    tb_stats: TBStats,
 }
 
 impl BrushCMD {
@@ -240,6 +270,7 @@ impl BrushCMD {
             cmp_strat,
             current_reads: HashMap::new(),
             last_position: None,
+            tb_stats: TBStats::default(),
         })
     }
 
@@ -252,30 +283,43 @@ impl BrushCMD {
         let writer = Writer::from_path(tb_path, header, self.tb_format)?;
         self.tb_writer = Some(writer);
 
+        let mut num_input_records = 0;
+        let mut num_output_records = 0;
+
         for tb_record in sam_reader {
+            self.tb_stats.total_input_reads += 1;
             // check if the record passes the options
             if !self.brush_args.keep_supplementary && tb_record.record().is_supplementary() {
+                self.tb_stats.filtered_reads += 1;
                 continue;
             }
             if !self.brush_args.keep_unmapped && tb_record.record().is_unmapped() {
+                self.tb_stats.filtered_reads += 1;
                 continue;
             }
             if tb_record.record().mapq() < self.brush_args.min_qual.unwrap_or(0) {
+                self.tb_stats.filtered_reads += 1;
                 continue;
             }
             if get_nh_tag(&tb_record.record())?.unwrap_or(1) > self.brush_args.max_nh.unwrap_or(u16::MAX) {
+                self.tb_stats.filtered_reads += 1;
                 continue;
             }
             if self.brush_args.include_flags.is_some() && !flags_set(&tb_record.record(), self.brush_args.include_flags.unwrap()) {
                 self.tb_writer.as_mut().unwrap().write(&tb_record.record())?;
+                self.tb_stats.total_output_reads += 1;
                 continue;
             }
 
             // everything else can be processed via merging
+            self.tb_stats.processed_reads += 1;
             self.process_record(tb_record)?;
 
         }
         self.flush_current_reads()?;
+
+        // Print summary
+        self.tb_stats.print_summary();
 
         Ok(())
     }
@@ -308,6 +352,7 @@ impl BrushCMD {
             grouped_reads.representative.push_aux(b"YX",rust_htslib::bam::record::Aux::I32(grouped_reads.samples.iter().filter(|&&s| s).count() as i32))?;
             
             self.tb_writer.as_mut().unwrap().write(&grouped_reads.representative)?;
+            self.tb_stats.total_output_reads += 1;
         }
         Ok(())
     }

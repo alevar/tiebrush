@@ -1,115 +1,206 @@
-cmake_minimum_required(VERSION 2.8)
-project(tiebrush)
+cmake_minimum_required(VERSION 3.10)
+project(tiebrush VERSION 1.0.0 LANGUAGES CXX)
 
-# set (CMAKE_STATIC_LINKER_FLAGS "-Wl,--as-needed.-lcurl")
-
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fpermissive -DNOCURL=1")
-
+# Options
 option(TIEBRUSH_BUILD_LIBBIGWIG "Turn on/off building step of libBigWig (used for bioconda)." ON)
+option(TIEBRUSH_NATIVE_BUILD "Architecture-specific optimizations, i.e., g++ -march=native." OFF)
+option(TIEBRUSH_STATIC_BUILD "Static build." OFF)
+
+# Compiler definitions
 if (NOT TIEBRUSH_BUILD_LIBBIGWIG)
-    add_definitions(-DTIEBRUSH_BUILD_LIBBIGWIG=0)
+    add_compile_definitions(TIEBRUSH_BUILD_LIBBIGWIG=0)
     set(LIBBIGWIG_MAKE_CMD "")
 else ()
-    add_definitions(-DTIEBRUSH_BUILD_LIBBIGWIG=1)
+    add_compile_definitions(TIEBRUSH_BUILD_LIBBIGWIG=1)
     set(LIBBIGWIG_MAKE_CMD "make")
 endif ()
 
-option(TIEBRUSH_NATIVE_BUILD "Architecture-specific optimizations, i.e., g++ -march=native." OFF)
 if (TIEBRUSH_NATIVE_BUILD)
-    add_definitions(-DTIEBRUSH_NATIVE_BUILD=1)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+    add_compile_definitions(TIEBRUSH_NATIVE_BUILD=1)
+    add_compile_options(-march=native)
     if (CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -xHOST -ipo -no-prec-div -fp-model fast=2")
+        add_compile_options(-xHOST -ipo -no-prec-div -fp-model fast=2)
     endif ()
 endif ()
 
-option(TIEBRUSH_STATIC_BUILD "Static build." OFF)
 if (TIEBRUSH_STATIC_BUILD)
-    add_definitions(-DTIEBRUSH_STATIC_BUILD=1)
+    add_compile_definitions(TIEBRUSH_STATIC_BUILD=1)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
     set(BUILD_SHARED_LIBS OFF)
     # apple does not support fully static builds, but at least libgcc and libstdc++
     if (APPLE)
-        set (CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+        set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
         message(WARNING "WARNING: Builds on Mac are never fully static.")
     else ()
-        set (CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc -static-libstdc++")
+        set(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc -static-libstdc++")
     endif ()
-    # on linux cmake adds -rdynamic automatically which clang can't handle in static builds
-    # if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-    #     set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
-    # endif ()
 endif ()
 
-include_directories("${CMAKE_SOURCE_DIR}/include/")
-link_directories("${CMAKE_SOURCE_DIR}/include/htslib")
+# Common compiler flags
+add_compile_options(-fpermissive -DNOCURL=1)
 
+# Find required packages
+find_package(Threads REQUIRED)
+
+# Try to find pkg-config, but make it optional
+find_package(PkgConfig QUIET)
+
+# Find compression libraries with fallbacks
+if(PkgConfig_FOUND)
+    pkg_check_modules(ZLIB QUIET zlib)
+    pkg_check_modules(LZMA QUIET liblzma)
+    pkg_check_modules(BZ2 QUIET libbz2)
+endif()
+
+# Fallback: find libraries directly if pkg-config didn't work
+if(NOT ZLIB_FOUND)
+    find_library(ZLIB_LIBRARIES NAMES z)
+    if(ZLIB_LIBRARIES)
+        set(ZLIB_FOUND TRUE)
+    endif()
+endif()
+
+if(NOT LZMA_FOUND)
+    find_library(LZMA_LIBRARIES NAMES lzma)
+    if(LZMA_LIBRARIES)
+        set(LZMA_FOUND TRUE)
+    endif()
+endif()
+
+if(NOT BZ2_FOUND)
+    find_library(BZ2_LIBRARIES NAMES bz2)
+    if(BZ2_LIBRARIES)
+        set(BZ2_FOUND TRUE)
+    endif()
+endif()
+
+# Set default libraries if not found (these are usually available on macOS)
+if(NOT ZLIB_FOUND)
+    set(ZLIB_LIBRARIES z)
+    set(ZLIB_FOUND TRUE)
+endif()
+
+if(NOT LZMA_FOUND)
+    set(LZMA_LIBRARIES lzma)
+    set(LZMA_FOUND TRUE)
+endif()
+
+if(NOT BZ2_FOUND)
+    set(BZ2_LIBRARIES bz2)
+    set(BZ2_FOUND TRUE)
+endif()
+
+# External projects
 include(ExternalProject)
-ExternalProject_Add(htslib
-        SOURCE_DIR ${CMAKE_SOURCE_DIR}/include/htslib/
-        BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND autoreconf -i COMMAND ./configure --without-libdeflate --disable-libcurl
-        BUILD_COMMAND ${MAKE}
-        INSTALL_COMMAND ""
-        )
 
-add_executable(tiebrush src/tiebrush.cpp
-        src/commons.h
-        src/GSam.cpp
-        src/GSam.h
-        src/tmerge.cpp
-        src/tmerge.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp)
+# htslib external project
+ExternalProject_Add(htslib
+    GIT_REPOSITORY "https://github.com/samtools/htslib.git"
+    GIT_TAG "1.18"
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/include/htslib/
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND autoreconf -i COMMAND ./configure --without-libdeflate --disable-libcurl
+    BUILD_COMMAND ${MAKE}
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a
+)
+
+# libBigWig external project
+ExternalProject_Add(libBigWig
+    GIT_REPOSITORY "https://github.com/alevar/libBigWig"
+    UPDATE_COMMAND ""
+    DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/include/"
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/include/libBigWig"
+    BUILD_IN_SOURCE 1
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND "${LIBBIGWIG_MAKE_CMD}"
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a
+)
+
+# Create imported targets for external libraries
+add_library(hts STATIC IMPORTED)
+set_target_properties(hts PROPERTIES
+    IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a
+    INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include/htslib
+)
+
+add_library(bigwig STATIC IMPORTED)
+set_target_properties(bigwig PROPERTIES
+    IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a
+    INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include/libBigWig
+)
+
+# tiebrush executable
+add_executable(tiebrush
+    src/tiebrush.cpp
+    src/commons.h
+    src/GSam.cpp
+    src/GSam.h
+    src/tmerge.cpp
+    src/tmerge.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
+    ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.cpp
+    ${CMAKE_SOURCE_DIR}/include/gclib/GBase.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp
+)
+
+target_include_directories(tiebrush PRIVATE
+    ${CMAKE_SOURCE_DIR}/include/
+    ${CMAKE_SOURCE_DIR}/include/htslib
+)
+
+target_link_libraries(tiebrush
+    hts
+    Threads::Threads
+    ${ZLIB_LIBRARIES}
+    ${LZMA_LIBRARIES}
+    ${BZ2_LIBRARIES}
+)
 
 add_dependencies(tiebrush htslib)
-if (APPLE AND TIEBRUSH_STATIC_BUILD)
-    target_link_libraries(tiebrush ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
-else ()
-    target_link_libraries(tiebrush ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
-endif ()
 
-ExternalProject_Add(libBigWig
-        GIT_REPOSITORY "https://github.com/alevar/libBigWig"
-        UPDATE_COMMAND ""
-        DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/include/"
-        SOURCE_DIR "${CMAKE_SOURCE_DIR}/include/libBigWig"
-        BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND "${LIBBIGWIG_MAKE_CMD}"
-        INSTALL_COMMAND ""
-        )
+# tiecov executable
+add_executable(tiecov
+    src/tiecov.cpp
+    src/commons.h
+    src/GSam.cpp
+    src/GSam.h
+    src/tmerge.cpp
+    src/tmerge.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
+    ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.cpp
+    ${CMAKE_SOURCE_DIR}/include/gclib/GBase.h
+    ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp
+)
 
-include_directories(${CMAKE_SOURCE_DIR}/include/libBigWig)
-link_directories(${CMAKE_SOURCE_DIR}/include/libBigWig)
+target_include_directories(tiecov PRIVATE
+    ${CMAKE_SOURCE_DIR}/include/
+    ${CMAKE_SOURCE_DIR}/include/htslib
+    ${CMAKE_SOURCE_DIR}/include/libBigWig
+)
 
-add_executable(tiecov src/tiecov.cpp
-        src/commons.h
-        src/GSam.cpp
-        src/GSam.h
-        src/tmerge.cpp
-        src/tmerge.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GStr.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GArgs.cpp
-        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.h
-        ${CMAKE_SOURCE_DIR}/include/gclib/GBase.cpp)
+target_link_libraries(tiecov
+    bigwig
+    hts
+    Threads::Threads
+    ${ZLIB_LIBRARIES}
+    ${LZMA_LIBRARIES}
+    ${BZ2_LIBRARIES}
+)
 
 add_dependencies(tiecov htslib libBigWig)
 
-if (APPLE AND TIEBRUSH_STATIC_BUILD)
-    target_link_libraries(tiecov ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
-else ()
-    target_link_libraries(tiecov ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a z lzma bz2 pthread)
-endif ()
-
-install(TARGETS tiebrush DESTINATION ${CMAKE_INSTALL_PREFIX})
-install(TARGETS tiecov DESTINATION ${CMAKE_INSTALL_PREFIX})
+# Installation
+install(TARGETS tiebrush tiecov
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
 install(PROGRAMS tiewrap.py DESTINATION ${CMAKE_INSTALL_PREFIX})

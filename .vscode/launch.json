@@ -1,30 +1,175 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Run tiebrush",
+            "name": "Debug tiebrush aleksey",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}\\tiebrush.exe",
-            "args": [],
+            "program": "${workspaceFolder}/tiebrush",
+            "args": ["-o","${workspaceFolder}/example/aleksey/t1.tb.bam", "${workspaceFolder}/example/aleksey/tissue1.sub.bam", "${workspaceFolder}/example/aleksey/tissue2.sub.bam"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set breakpoint on throw",
+                    "text": "breakpoint set -E c++",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug tiecov aleksey",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tiecov",
+            "args": ["-j", "${workspaceFolder}/example/aleksey/t1.junc.bed", "${workspaceFolder}/example/aleksey/t1.tb.bam"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug tiebrush",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tiebrush",
+            "args": ["-o","${workspaceFolder}/example/t1/t1.bam", "${workspaceFolder}/example/t1/t1s0.bam", "${workspaceFolder}/example/t1/t1s1.bam"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set breakpoint on throw",
+                    "text": "breakpoint set -E c++",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug tiecov",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tiecov",
+            "args": ["-j", "${workspaceFolder}/example/t1/t1.junc.bed", "${workspaceFolder}/example/t1/t1.bam"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug testsam",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/testsam",
+            "args": ["-h"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug testsam with test data",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/testsam",
+            "args": ["${workspaceFolder}/test/t1/t1.bam", "-v"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug testsam - stop at entry",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/testsam",
+            "args": ["${workspaceFolder}/test/t1/t1.bam", "-v"],
             "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "externalConsole": true,
-            "MIMode": "gdb",
-            "miDebuggerPath": "C:\\Prog\\msys2\\mingw64\\bin\\gdb.exe",
+            "externalConsole": false,
+            "MIMode": "lldb",
             "setupCommands": [
                 {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
                     "ignoreFailures": true
                 }
-            ] /*,
-            "preLaunchTask": "C/C++: g++.exe build active file"
-            */
+            ],
+            "preLaunchTask": "Build"
+        },
+        {
+            "name": "Debug testsam - fast build",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/testsam",
+            "args": ["${workspaceFolder}/test/t1/t1.bam", "-v"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Build testsam only"
         },
         {
             "name": "sashimi debug",
@@ -40,9 +185,8 @@
                 "--zoom_start","215802557",
                 "--zoom_end","215803158",
                 "--intron_scale","10",
-                "--extend_by","7000",
-            ],
+                "--extend_by","7000"
+            ]
         }
-        
     ]
 }

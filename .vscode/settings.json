@@ -1,0 +1,30 @@
+{
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.autoAddFileAssociations": true,
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/include/**",
+        "/opt/homebrew/include",
+        "/usr/local/include"
+    ],
+    "C_Cpp.default.defines": [
+        "TIEBRUSH_BUILD_LIBBIGWIG=1",
+        "NOCURL=1"
+    ],
+    "C_Cpp.default.cppStandard": "c++11",
+    "C_Cpp.default.cStandard": "c99",
+    "C_Cpp.default.compilerPath": "/opt/homebrew/bin/g++",
+    "files.associations": {
+        "*.h": "c",
+        "*.hpp": "cpp",
+        "*.cpp": "cpp",
+        "*.c": "c"
+    },
+    "terminal.integrated.defaultProfile.osx": "zsh",
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "cmake.configureOnOpen": true,
+    "cmake.buildDirectory": "${workspaceFolder}",
+    "cmake.sourceDirectory": "${workspaceFolder}"
+} 

@@ -62,7 +62,9 @@ const char* USAGE = "TieBrush v" VERSION "\n"
                               "  -N\t\t\tMaximum NH score of the reads to retain\n"
                               "  -Q\t\t\tMinimum mapping quality of the reads to retain\n"
                               "  -F\t\t\tBits in SAM flag to use in read comparison. Only reads that\n"
-                              "    \t\t\thave specified flags will be merged together (default: 0)\n";
+							  "    \t\t\thave specified flags will be merged together (default: 0)\n"
+							  "  -A,--collapse-same\tIf enabled, will collapse same read alignment\n"
+							  "    \tduplicated just for pairing reasons (default: disabled)\n";
 
 // 1. add mode to select representative alignment
 // 2. add mode to select consensus sequence
@@ -84,6 +86,7 @@ struct Options{
     bool keep_unmapped = true;
     bool keep_supplementary = false;
     uint32_t flags = 0;
+    bool collapse_same = false;
 } options;
 
 TMrgStrategy mrgStrategy=tMrgStratCIGAR;
@@ -396,8 +399,9 @@ class SPData { // Same Point data
     		int64_t vYD=rec.tag_int("YD",0);
     		if (vYD>maxYD) maxYD=vYD; //keep only maximum YD value
     	} else {
-    		//avoid collapsing same read alignment duplicated just for pairing reasons
-    		if (!samples->test(trec.fidx) || rec.pairOrder()!=r->pairOrder() ||
+    		//avoid collapsing same read alignment duplicated just for pairing reasons (optional)
+    		if (!options.collapse_same || 
+    		    !samples->test(trec.fidx) || rec.pairOrder()!=r->pairOrder() ||
     				strcmp(r->name(), rec.name())!=0) {
     		   dupCount++;
     		   samples->set(trec.fidx);
@@ -576,7 +580,7 @@ int main(int argc, char *argv[])  {
 // <------------------ main() end -----
 
 void processOptions(int argc, char* argv[]) {
-    GArgs args(argc, argv, "help;debug;verbose;version;full;clip;exon;keep-supp;keep-unmap;SMLPEDVho:N:Q:F:");
+    GArgs args(argc, argv, "help;debug;verbose;version;full;clip;exon;keep-supp;keep-unmap;collapse-same;SMLPEDVho:N:Q:F:A");
     args.printError(USAGE, true);
 
     if (args.getOpt('h') || args.getOpt("help")) {
@@ -615,6 +619,7 @@ void processOptions(int argc, char* argv[]) {
     }
     options.keep_supplementary = (args.getOpt("keep-supp")!=NULL || args.getOpt("S")!=NULL);
     options.keep_unmapped = (args.getOpt("keep-unmap")!=NULL || args.getOpt("M")!=NULL);
+    options.collapse_same = (args.getOpt("collapse-same")!=NULL || args.getOpt('A')!=NULL);
 
     bool stratF=(args.getOpt("full")!=NULL || args.getOpt('L')!=NULL);
     bool stratP=(args.getOpt("clip")!=NULL || args.getOpt('P')!=NULL);

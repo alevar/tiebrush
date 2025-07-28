@@ -5,6 +5,11 @@ project(tiebrush VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set debug build type if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug)
+endif()
+
 # Options
 option(TIEBRUSH_BUILD_LIBBIGWIG "Turn on/off building step of libBigWig (used for bioconda)." ON)
 option(TIEBRUSH_NATIVE_BUILD "Architecture-specific optimizations, i.e., g++ -march=native." OFF)
@@ -41,7 +46,7 @@ if (TIEBRUSH_STATIC_BUILD)
 endif ()
 
 # Common compiler flags
-add_compile_options(-fpermissive -DNOCURL=1)
+add_compile_options(-fpermissive -DNOCURL=1 -g -O0)
 
 # Find required packages
 find_package(Threads REQUIRED)

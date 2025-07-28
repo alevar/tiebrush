@@ -1,21 +1,31 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "macOS",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/../gclib",
-                "${workspaceFolder}/../htslib"
+                "${workspaceFolder}/include/**",
+                "${workspaceFolder}/include/gclib/**",
+                "${workspaceFolder}/include/htslib/**",
+                "${workspaceFolder}/include/libBigWig/**",
+                "/opt/homebrew/include",
+                "/usr/local/include"
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
-                "_UNICODE"
+                "_UNICODE",
+                "TIEBRUSH_BUILD_LIBBIGWIG=1",
+                "NOCURL=1"
             ],
-            "windowsSdkVersion": "10.0.18362.0",
-            "compilerPath": "C:/Prog/msys2/mingw64/bin/g++.exe",
+            "macFrameworkPath": [
+                "/Library/Frameworks",
+                "/System/Library/Frameworks"
+            ],
+            "compilerPath": "/opt/homebrew/bin/g++",
             "cStandard": "c99",
-            "cppStandard": "c++11"
+            "cppStandard": "c++11",
+            "intelliSenseMode": "macos-clang-x64"
         }
     ],
     "version": 4

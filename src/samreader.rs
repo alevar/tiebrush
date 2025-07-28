@@ -108,6 +108,10 @@ impl TBSAMReader {
                 mheader = Header::from_template(&ref_header.clone().unwrap());
             }
 
+            // add CO line with sample data to the header
+            let comment_line = format!("SAMPLE:{}", file.as_ref().canonicalize().unwrap().to_string_lossy());
+            mheader.push_comment(comment_line.as_bytes());
+
             let mut record = Record::new();
             match reader.read(&mut record) {
                 Some(Ok(_)) => {
@@ -117,9 +121,6 @@ impl TBSAMReader {
                 None => {},
             }
             readers.push(reader);
-            // add CO line with sample data to the header
-            let comment_line = format!("SAMPLE:{}", file.as_ref().canonicalize().unwrap().to_string_lossy());
-            mheader.push_comment(comment_line.as_bytes());
         }
 
         // add PG for TieBrush

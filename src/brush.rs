@@ -62,9 +62,13 @@ pub struct BrushArgs {
     #[arg(short='E', long="exon")]
     pub exon: bool,
     /// If enabled, supplementary alignments will be included in the collapsed groups of reads. 
-    /// By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each supplementary mapping will count as a separate read
+    /// By default, TieBrush removes any mappings flagged as supplementary (0x800). Note, that if enabled, each supplementary mapping will count as a separate read
     #[arg(short='S', long="keep-supp")]
     pub keep_supplementary: bool,
+    /// If enabled, secondary alignments will be included in the collapsed groups of reads. 
+    /// By default, TieBrush removes any mappings not listed as primary (0x100). Note, that if enabled, each secondary mapping will count as a separate read
+    #[arg(short='s', long="keep-secondary")]
+    pub keep_secondary: bool,
     /// If enabled, unmapped reads will be included in the collapsed groups of reads. 
     /// By default, TieBrush removes any unmapped reads.
     #[arg(short='U', long="keep-unmapped")]
@@ -287,6 +291,10 @@ impl BrushCMD {
             self.tb_stats.total_input_reads += 1;
             // check if the record passes the options
             if !self.brush_args.keep_supplementary && tb_record.record().is_supplementary() {
+                self.tb_stats.filtered_reads += 1;
+                continue;
+            }
+            if !self.brush_args.keep_secondary && tb_record.record().is_secondary() {
                 self.tb_stats.filtered_reads += 1;
                 continue;
             }

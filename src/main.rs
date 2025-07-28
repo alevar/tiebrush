@@ -1,5 +1,7 @@
 mod brush;
 mod cov;
+#[cfg(feature = "test")]
+mod test;
 mod samreader;
 mod commons;
 
@@ -19,6 +21,8 @@ struct Cli {
 enum Commands {
     Brush(brush::BrushArgs),
     Cov(cov::CovArgs),
+    #[cfg(feature = "test")]
+    Test(test::TestArgs),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -30,6 +34,10 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::Cov(cov_ops) => {
             cov::run(cov_ops)?;
+        }
+        #[cfg(feature = "test")]
+        Commands::Test(test_ops) => {
+            test::run(test_ops)?;
         }
     }
 

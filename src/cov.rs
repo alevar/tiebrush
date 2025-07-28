@@ -98,9 +98,6 @@ pub struct TBCov {
     end: i64,
     cov: Vec<i32>,
     junc: JuncMat,
-    
-    store_cov: bool,
-    store_junc: bool,
 }
 
 impl TBCov {
@@ -109,23 +106,15 @@ impl TBCov {
                 start, end,
                 cov: vec![val as i32; (end - start) as usize],
                 junc: JuncMat::default(),
-                store_cov: true,
-                store_junc: true,
         }
     }
 
-    pub fn new_from_record(record: &Record) -> Self {
+    pub fn new_from_record(record: &Record, store_cov: bool, store_junc: bool) -> Self {
         let start = record.pos();
         let end = record.reference_end();
-        Self::new(record.tid(), start, end, 1)
-    }
-
-    pub fn set_store_cov(&mut self, store_cov: bool) {
-        self.store_cov = store_cov;
-    }
-
-    pub fn set_store_junc(&mut self, store_junc: bool) {
-        self.store_junc = store_junc;
+        let mut tbcov = Self::new(record.tid(), start, end, 0);
+        tbcov.add_record(record, store_cov, store_junc);
+        tbcov
     }
     
     /// Adds a record's coverage to the BCov region.
@@ -137,7 +126,7 @@ impl TBCov {
     /// # Note
     /// - The caller is responsible for ensuring only compatible records are passed to this method.
     /// - Unmapped records are ignored (no error is returned).
-    pub fn add_record(&mut self, record: &Record) -> anyhow::Result<()> {
+    pub fn add_record(&mut self, record: &Record, store_cov: bool, store_junc: bool) -> anyhow::Result<()> {
         if record.tid() != self.seqid {
             anyhow::bail!("Record tid {} does not match BCov seqid {}", record.tid(), self.seqid);
         }
@@ -154,7 +143,7 @@ impl TBCov {
             None => 1,
         };
 
-        if record.reference_end() > self.end && self.store_cov {
+        if record.reference_end() > self.end && store_cov {
             // extend the cov vec
             let extend_len = (record.reference_end() - self.end) as usize;
             self.cov.extend(vec![0; extend_len]);
@@ -166,7 +155,7 @@ impl TBCov {
         for op in record.cigar().iter() {
             match op {
                 Cigar::Match(len) | Cigar::Equal(len) | Cigar::Diff(len) => {
-                    if self.store_cov {
+                    if store_cov {
                         for _ in 0..*len {
                             self.cov[(ref_pos - self.start) as usize] += yc;
                             ref_pos += 1;
@@ -184,7 +173,7 @@ impl TBCov {
                 }
                 Cigar::RefSkip(len) => {
                     // add to junc mat
-                    if self.store_junc {
+                    if store_junc {
                         let strand = get_strand(&record)?;
                         self.junc.increment(strand, ref_pos, ref_pos + *len as i64, yc.try_into().unwrap());
                     }
@@ -414,10 +403,7 @@ impl CovCMD {
         // get first record;
         let mut tbcov = match self.sam_reader.next() {
             Some(tb_record) => {
-                let mut tbcov = TBCov::new_from_record(&tb_record.record());
-                tbcov.set_store_cov(self.cov_args.coverage.is_some());
-                tbcov.set_store_junc(self.cov_args.junctions.is_some());
-                tbcov
+                TBCov::new_from_record(&tb_record.record(),self.cov_args.coverage.is_some(),self.cov_args.junctions.is_some())
             },
             None => {
                 anyhow::bail!("No records found in the input alignments");
@@ -449,12 +435,10 @@ impl CovCMD {
                 if self.cov_args.junctions.is_some() {
                     self.flush_junc(&tbcov)?;
                 }
-                tbcov = TBCov::new_from_record(&record);
-                tbcov.set_store_cov(self.cov_args.coverage.is_some());
-                tbcov.set_store_junc(self.cov_args.junctions.is_some());
+                tbcov = TBCov::new_from_record(&record,self.cov_args.coverage.is_some(),self.cov_args.junctions.is_some());
             }
             else {
-                tbcov.add_record(&record)?;
+                tbcov.add_record(&record,self.cov_args.coverage.is_some(),self.cov_args.junctions.is_some())?;
             }
         }
         if self.cov_args.coverage.is_some() {

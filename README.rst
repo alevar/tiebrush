@@ -43,38 +43,47 @@ Building from source
 
 If you want to build it from source, we recommend cloning the git repository as shown below to ensure
 fixed releases of any dependencies are fetched and compiled with the software.
-
-::
-
-    $ git clone https://github.com/alevar/tiebrush.git --recursive
-    $ cd tiebrush/
-    $ cmake -DCMAKE_BUILD_TYPE=Release .
-    $ make -j4
-    $ make install
-
-For a fully static build `-DTIEBRUSH_STATIC_BUILD=1` needs to be added to the list of arguments
-in the cmake command.
-
-By default make install will likely require administrative privileges. To specify custom
-installation path `-DCMAKE_INSTALL_PREFIX=<custom/installation/path>` needs to be added to
-the list of arguments in the cmake command.
-
-If you are using a very old version of Git (< 1.6.5) the flag ``--recursive`` does not exist.
-In this case you need to clone the submodule separately  (``git submodule update --init --recursive``).
-
+    
 **Requirements**
 
 Operating System
   GNU/Linux, Mac
 
-Compiler
-  GCC ≥ 4.8, LLVM/Clang ≥ 3.8
+Rust Requirements
+  Rust ≥ 1.70 (install via `rustup`)
 
-Build system
-  CMake ≥ 2.8
+**Rust Installation**
 
-Language support
-  C++11
+If you don't have Rust installed, you can install it using rustup:
+
+::
+
+    # Install rustup (Linux/macOS)
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    
+    # Or on macOS with Homebrew
+    brew install rust
+    
+    # Verify installation
+    rustc --version
+    cargo --version
+
+**Building**
+
+The Rust implementation provides improved performance and memory efficiency:
+
+::
+
+    # Clone the repository with Rust branch
+    git clone --branch rust https://github.com/alevar/tiebrush.git
+    cd tiebrush/
+    
+    # Build in release mode for optimal performance
+    cargo build --release
+    
+    # The binary will be available at target/release/tiebrush
+    ./target/release/tiebrush --help
+
 
 Methods
 ^^^^^^^
@@ -93,7 +102,7 @@ samples, painting a comprehensive "background" picture of read alignments with t
 many samples.
 ::
 
-  tiebrush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
+  tiebrush brush  [-h] -o OUTPUT [-L|-P|-E] [-S] [-M] [-N max_NH_value] [-Q min_mapping_quality] [-F FLAGS] ...
 
   Input arguments:
 
@@ -133,9 +142,6 @@ Custom SAM tags implemented
 ---------------------------
 1. **YC**:i:N stores the number of alignments that were merged into this alignment record (multiplicity count)
 2. **YX**:i:N stores the number of samples that have this alignment (sample count)
-3. **YD**:i:N keeps track of the maximum number of contiguous bases preceding the start of the read alignment in the samples(s) that it belongs to. In other words, if the current alignment is part of an exon-overlapping bundle (strand specific!), this value holds the maximum distance from the beginning of the bundle to the start of this alignment, across all samples having this alignment. If the alignment is not in a bundle (i.e. it is preceded by a uncovered region as it is not overlapped by any another alignment with a lower start position), in all the individual samples where that alignment is present, then the ``YD`` value is 0 and the tag is omitted from the output file produced by TieBrush. That means that all the alignments lacking a ``YD`` tag in the TieBrush output start at the very beginning of an exon-overlapping bundle (i.e. are not overlapped by a preceding alignment with a lower start coordinate).
-
-If either ``YC`` or ``YX`` tags are missing (i.e. ``GBamRecord::tag_int()`` call returns 0) then the alignment is unique (when ``YC`` is 0) or only one sample has it (if ``YX`` is 0). The actual count in such cases is 1.
 
 TieCov
 """"""
@@ -144,11 +150,10 @@ The TieCov utility can take the output file produced by TieBrush and can generat
 
 1. a BedGraph file with the coverage data (see http://genome.ucsc.edu/goldenPath/help/bedgraph.html); this file can be converted to BigWig (using bedGraphToBigWig) or to TDF format (using igvtools) in order to be loaded in IGV as an additional coverage track
 2. a junction BED file which can be loaded directly in IGV as an additional junction track (http://software.broadinstitute.org/software/igv/splice_junctions)
-3. a heatmap BED that uses color intensity to represent the number of samples that contain each position.
 
 ::
 
-  tiecov [-s out.sample.bed] [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] input
+  tiebrush cov [-c out.coverage.bedgraph] [-j out.junctions.bed] [-W] input
   
   Input arguments (required):
   
@@ -156,8 +161,6 @@ The TieCov utility can take the output file produced by TieBrush and can generat
   
   Optional arguments (at least one of -s/-c/-j must be specified):
   
-  -s    output BED file with an estimate of the number of samples which contain alignments 
-        for each interval.
   -j    output BED file with coverage of all splice-junctions in the input file.
   -c    output BedGraph (or BigWig with '-W') file with coverage for all mapped bases.
   -W    save coverage to -c file in BigWig format. Default output is in BED format.

@@ -8,8 +8,10 @@ use clap::{Args, ArgGroup};
 use std::collections::{HashMap, hash_map::Entry};
 use rust_htslib::bam::{Record, HeaderView, record::Cigar, ext::BamRecordExtensions};
 
-use bigtools::{BigWigWrite, ChromInfo};
-use bigtools::utils::reopen::Reopen;
+use bigtools::{BigWigWrite, Value};
+use bigtools::beddata::BedParserStreamingIterator;
+
+use tokio::runtime::Runtime;
 
 #[derive(Args, Debug)]
 #[command(group(
@@ -235,7 +237,7 @@ impl CoverageWriter for BedGraphWriter {
 }
 
 struct BigWigWriter {
-    writer: BigWigWrite<File>,
+    writer: Option<BigWigWrite<File>>,
     intervals: Vec<(String, i64, i64, f32)>,
 }
 
@@ -258,7 +260,7 @@ impl BigWigWriter {
 
         let writer = BigWigWrite::create_file(path, chrom_map)?;
         Ok(Self {
-            writer,
+            writer: Some(writer),
             intervals: Vec::new(),
         })
     }
@@ -276,10 +278,6 @@ impl CoverageWriter for BigWigWriter {
             self.intervals.sort_by(|a, b| {
                 a.0.cmp(&b.0).then(a.1.cmp(&b.1))
             });
-
-            // Create an iterator over the intervals
-            use bigtools::beddata::BedParserStreamingIterator;
-            use bigtools::Value;
             
             let data_intervals: Vec<_> = self.intervals.iter().map(|(chrom, start, end, value)| {
                 (chrom.as_str(), Value {
@@ -289,14 +287,16 @@ impl CoverageWriter for BigWigWriter {
                 })
             }).collect();
 
-            // Create a streaming iterator from the intervals
             let data = BedParserStreamingIterator::wrap_infallible_iter(
                 data_intervals.into_iter(),
                 true // sorted
             );
 
-            // For now, we'll just clear the intervals since we can't easily write without tokio
-            // In a full implementation, you'd want to properly write the BigWig data
+            if let Some(writer) = self.writer.take() {
+                let runtime = Runtime::new()?;
+                let _ = writer.write(data, runtime);
+            }
+            
             self.intervals.clear();
         }
         Ok(())
@@ -363,60 +363,26 @@ impl CovCMD {
         let seqname = std::str::from_utf8(self.header_view.tid2name(tbcov.seqid as u32))
             .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in sequence name: {}", e))?
             .to_string();
-        
-        let mut start_pos = None;
-        let mut current_val = 0i32;
-        
-        for (i, &val) in tbcov.cov.iter().enumerate() {
+
+        let mut first_pos = tbcov.start;
+        let mut last_pos = tbcov.start;
+        let mut pos_cov = tbcov.cov[0];
+        for (i, val) in tbcov.cov.iter().enumerate() {
+            if *val == 0 {
+                continue;
+            }
             let pos = tbcov.start + i as i64;
-            
-            if val == 0 {
-                // End current interval if we have one
-                if let Some(start) = start_pos {
-                    if current_val > 0 {
-                        if let Some(writer) = &mut self.cov_writer {
-                            writer.write_interval(&seqname, start, pos, current_val as f32)?;
-                        }
-                    }
-                    start_pos = None;
-                }
-            } else {
-                match start_pos {
-                    Some(start) => {
-                        // Continue or end current interval
-                        if val != current_val {
-                            // End current interval and start new one
-                            if current_val > 0 {
-                                if let Some(writer) = &mut self.cov_writer {
-                                    writer.write_interval(&seqname, start, pos, current_val as f32)?;
-                                }
-                            }
-                            start_pos = Some(pos);
-                            current_val = val;
-                        }
-                    }
-                    None => {
-                        // Start new interval
-                        start_pos = Some(pos);
-                        current_val = val;
-                    }
-                }
+            if *val != pos_cov {
+                self.cov_writer.as_mut().unwrap().write_interval(&seqname, first_pos, last_pos + 1, pos_cov as f32)?;
+                first_pos = pos;
+                pos_cov = *val;
             }
+            last_pos = pos;
         }
+        // Write the last interval
+        self.cov_writer.as_mut().unwrap().write_interval(&seqname, first_pos, last_pos + 1, pos_cov as f32)?;
         
-        // Handle final interval
-        if let Some(start) = start_pos {
-            if current_val > 0 {
-                let end_pos = tbcov.start + tbcov.cov.len() as i64;
-                if let Some(writer) = &mut self.cov_writer {
-                    writer.write_interval(&seqname, start, end_pos, current_val as f32)?;
-                }
-            }
-        }
-        
-        if let Some(writer) = &mut self.cov_writer {
-            writer.flush()?;
-        }
+        self.cov_writer.as_mut().unwrap().flush()?;
         Ok(())
     }
 

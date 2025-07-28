@@ -49,13 +49,12 @@ pub struct CovArgs {
 /// otherwise errors will be thrown.
 #[derive(Debug)]
 pub struct JuncMat {
-    pub seqid: i32,
     data: HashMap<(Strand,i64, i64), u64>,
 }
 
 impl JuncMat {
-    pub fn new(seqid: i32) -> Self {
-        Self { seqid, data: HashMap::new() }
+    pub fn new() -> Self {
+        Self {data: HashMap::new() }
     }
 
     pub fn insert(&mut self, strand: Strand, start: i64, end: i64, val: u64) {
@@ -74,7 +73,7 @@ impl JuncMat {
         self.data.is_empty()
     }
 
-    /// Increment the value for a given junction, or insert with 1 if not present (for counts).
+    /// Increment the value for a given junction, or insert with the provided value if not present (for counts).
     pub fn increment(&mut self, strand: Strand, start: i64, end: i64, val: u64)
     {
         match self.data.entry((strand, start, end)) {
@@ -87,7 +86,6 @@ impl JuncMat {
 impl Default for JuncMat {
     fn default() -> Self {
         Self {
-            seqid: 0,
             data: HashMap::new(),
         }
     }
@@ -179,7 +177,7 @@ impl TBCov {
                         continue;
                     }
                 }
-                Cigar::Ins(len) | Cigar::SoftClip(len) => {
+                Cigar::Ins(_len) | Cigar::SoftClip(_len) => {
                 }
                 Cigar::Del(len) => {
                     ref_pos += *len as i64;

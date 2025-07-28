@@ -1,4 +1,4 @@
-use rust_htslib::bam::{Record,record::{Aux}, Header, HeaderView, header::HeaderRecord, Format, record::Cigar};
+use rust_htslib::bam::{Record,record::{Aux}, Header, header::HeaderRecord, Format, record::Cigar};
 use std::fmt::{self, Display};
 use std::path::PathBuf;
 

@@ -161,7 +161,7 @@ impl ReadKeyStrat for ExonStrat {
     type Key = ExonReadKey;
 
     fn create_key(&self, record: &Record) -> anyhow::Result<Self::Key> {
-        let mut introns: Vec<(i64, i64)> = record.introns()
+        let introns: Vec<(i64, i64)> = record.introns()
         .map(|arr|(arr[0], arr[1]))
         .collect();
         Ok(Self::Key {
@@ -283,9 +283,6 @@ impl BrushCMD {
         let writer = Writer::from_path(tb_path, header, self.tb_format)?;
         self.tb_writer = Some(writer);
 
-        let mut num_input_records = 0;
-        let mut num_output_records = 0;
-
         for tb_record in sam_reader {
             self.tb_stats.total_input_reads += 1;
             // check if the record passes the options
@@ -388,7 +385,6 @@ mod tests {
     }
 
     fn create_test_record(read_name: &[u8], tid: i32, pos: i64, cigar: Vec<Cigar>, strand: bool) -> Record {
-        let header = create_test_header();
         let mut record = Record::new();
         
         record.set_tid(tid);

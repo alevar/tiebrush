@@ -5,6 +5,7 @@ use std::{path::PathBuf, vec};
 use std::collections::HashMap;
 use clap::{Args, ArgGroup};
 use rust_htslib::bam::{Record, record::Cigar, Format, ext::BamRecordExtensions, Writer};
+use rust_htslib::htslib;
 
 #[derive(Debug, Default)]
 pub struct TBStats {
@@ -279,7 +280,8 @@ impl BrushCMD {
     }
 
     pub fn run(&mut self) -> anyhow::Result<()> {
-        let sam_reader = TBSAMReader::new(&self.brush_args.input_alignments)?;
+        let req_fields = htslib::sam_fields_SAM_QNAME | htslib::sam_fields_SAM_FLAG | htslib::sam_fields_SAM_RNAME | htslib::sam_fields_SAM_POS | htslib::sam_fields_SAM_CIGAR | htslib::sam_fields_SAM_AUX;
+        let sam_reader = TBSAMReader::new_with_fields(&self.brush_args.input_alignments, req_fields)?;
         let header = sam_reader.get_header();
 
         // write TB header out

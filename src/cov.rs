@@ -7,6 +7,7 @@ use std::io::{BufWriter, Write};
 use clap::{Args, ArgGroup};
 use std::collections::{HashMap, hash_map::Entry};
 use rust_htslib::bam::{Record, HeaderView, record::Cigar, ext::BamRecordExtensions};
+use rust_htslib::htslib;
 
 use bigtools::{BigWigWrite, Value};
 use bigtools::beddata::BedParserStreamingIterator;
@@ -309,7 +310,8 @@ impl CovCMD {
         }
 
         // Create SAM reader to get header for BigWig initialization
-        let sam_reader = TBSAMReader::new(&args.input_alignments)?;
+        let req_fields = htslib::sam_fields_SAM_QNAME | htslib::sam_fields_SAM_FLAG | htslib::sam_fields_SAM_RNAME | htslib::sam_fields_SAM_POS | htslib::sam_fields_SAM_CIGAR | htslib::sam_fields_SAM_AUX;
+        let sam_reader = TBSAMReader::new_with_fields(&args.input_alignments, req_fields)?;
         let header = sam_reader.get_header();
         let header_view = HeaderView::from_header(header);
 

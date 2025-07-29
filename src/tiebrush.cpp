@@ -530,8 +530,8 @@ void flushPData(GList<SPData>& spdlst){ //write spdata to outfile
 }
 
 bool passes_options(GSamRecord* brec){
-    if(!options.keep_supplementary && brec->get_b()->core.flag & 0x100) return false;
-    if(!options.keep_secondary && brec->get_b()->core.flag & 0x200) return false;
+    if(!options.keep_supplementary && brec->get_b()->core.flag & 0x800) return false;
+    if(!options.keep_secondary && brec->get_b()->core.flag & 0x100) return false;
     if(!options.keep_unmapped && brec->isUnmapped()) return false;
     if(brec->mapq()<options.min_qual) return false;
     int nh = brec->tag_int("NH");
@@ -644,6 +644,12 @@ void processOptions(int argc, char* argv[]) {
     options.keep_unmapped = (args.getOpt("keep-unmap")!=NULL || args.getOpt("M")!=NULL);
     options.collapse_same = (args.getOpt("collapse-same")!=NULL || args.getOpt('A')!=NULL);
     options.store_frac = (args.getOpt("store-frac")!=NULL);
+	if (options.store_frac) {
+		if (!options.keep_secondary) {
+			GError("Error: --store-frac requires --keep-secondary to be enabled.\n");
+			exit(1);
+		}
+	}
 
     bool stratF=(args.getOpt("full")!=NULL || args.getOpt('L')!=NULL);
     bool stratP=(args.getOpt("clip")!=NULL || args.getOpt('P')!=NULL);

@@ -62,8 +62,8 @@ int juncCount=0;
 struct CJunc {
 	int start, end;
 	char strand;
-	uint64_t dupcount;
-	CJunc(int vs=0, int ve=0, char vstrand='+', uint64_t dcount=1):
+	double dupcount;
+	CJunc(int vs=0, int ve=0, char vstrand='+', double dcount=1.0):
 	  start(vs), end(ve), strand(vstrand), dupcount(dcount) { }
 
 	bool operator==(const CJunc& a) {
@@ -90,14 +90,14 @@ struct CJunc {
 
 	void write(FILE* f, const char* chr) {
 		juncCount++;
-		fprintf(f, "%s\t%d\t%d\tJUNC%08d\t%ld\t%c\n",
-				chr, start-1, end, juncCount, (long)dupcount, strand);
+		fprintf(f, "%s\t%d\t%d\tJUNC%08d\t%.3f\t%c\n",
+				chr, start-1, end, juncCount, dupcount, strand);
 	}
 };
 
 GArray<CJunc> junctions(64, true);
 
-void addJunction(GSamRecord& r, int dupcount) {
+void addJunction(GSamRecord& r, double dupcount) {
 	char strand = r.spliceStrand();
 //	if (strand!='+' && strand!='-') return; // TODO: should we output .?
 	for (int i=1;i<r.exons.Count();i++) {
@@ -191,7 +191,7 @@ void move2bsam(std::vector<std::set<int>>& bvec_idx,std::vector<std::pair<float,
 }
 
 //b_start MUST be passed 1-based
-void addCov(GSamRecord& r, int val, GVec<uint64_t>& bvec, int b_start) {
+void addCov(GSamRecord& r, double val, GVec<double>& bvec, int b_start) {
 	bam1_t* in_rec=r.get_b();
     int pos=in_rec->core.pos; // 0-based
     b_start--; //to make it 0-based
@@ -223,35 +223,35 @@ void addCov(GSamRecord& r, int val, GVec<uint64_t>& bvec, int b_start) {
 }
 
 //b_start MUST be passed 1-based
-void flushCoverage(FILE* outf,sam_hdr_t* hdr, GVec<uint64_t>& bvec,  int tid, int b_start) {
+void flushCoverage(FILE* outf,sam_hdr_t* hdr, GVec<double>& bvec,  int tid, int b_start) {
   if (tid<0 || b_start<=0) return;
   int i=0;
   b_start--; //to make it 0-based;
   while (i<bvec.Count()) {
-     uint64_t ival=bvec[i];
+     double ival=bvec[i];
      int j=i+1;
      while (j<bvec.Count() && ival==bvec[j]) {
     	 j++;
      }
-     if (ival!=0){
-         fprintf(outf, "%s\t%d\t%d\t%ld\n", hdr->target_name[tid], b_start+i, b_start+j, (long)ival);
+     if (ival!=0.0){
+         fprintf(outf, "%s\t%d\t%d\t%.3f\n", hdr->target_name[tid], b_start+i, b_start+j, ival);
      }
      i=j;
   }
 }
 
-void flushCoverage(bigWigFile_t* outf,sam_hdr_t* hdr, GVec<uint64_t>& bvec,  int tid, int b_start) {
+void flushCoverage(bigWigFile_t* outf,sam_hdr_t* hdr, GVec<double>& bvec,  int tid, int b_start) {
     if (tid<0 || b_start<=0) return;
     int i=0;
     b_start--; //to make it 0-based;
     bool first = true;
     while (i<bvec.Count()) {
-        uint64_t ival=bvec[i];
+        double ival=bvec[i];
         int j=i+1;
         while (j<bvec.Count() && ival==bvec[j]) {
             j++;
         }
-        if (ival!=0){
+        if (ival!=0.0){
             char *chromsUse[] = {hdr->target_name[tid]};
             uint32_t bw_start[] = {(uint32_t)b_start+i};
             uint32_t bw_end[] = {(uint32_t)b_start+j};
@@ -426,7 +426,7 @@ int main(int argc, char *argv[])  {
     }
 
     int prev_tid=-1;
-    GVec<uint64_t> bcov(2048*1024);
+    GVec<double> bcov(2048*1024);
     std::vector<std::pair<float,uint64_t>> bsam(2048*1024,{0,1}); // number of samples. 1st - current average; 2nd - total number of values
 //    std::vector<std::set<int>> bsam_idx(2048*1024,std::set<int>{}); // for indexed runs
     int b_end=0; //bundle start, end (1-based)
@@ -472,15 +472,17 @@ int main(int argc, char *argv[])  {
         } else { //extending current bundle
             if (b_end<endpos) {
                 b_end=endpos;
-                bcov.setCount(b_end-b_start+1, (int)0);
+                bcov.setCount(b_end-b_start+1, 0.0);
                 if (soutf){
                     bsam.resize(b_end-b_start+1,{0,1});
 //                    bsam_idx.resize(b_end-b_start+1,std::set<int>{});
                 }
             }
         }
-        int accYC = 0;
-        accYC = brec.tag_int("YC", 1);
+        double accYC = 1.0; // default value
+        if (brec.find_tag("YC") != NULL) {
+            accYC = brec.tag_float("YC");
+        }
         if(coutf || coutf_bw){
             addCov(brec, accYC, bcov, b_start);
         }

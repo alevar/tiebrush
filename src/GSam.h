@@ -300,6 +300,9 @@ class GSamRecord: public GSeg {
     int add_int_tag(const char tag[2], int64_t val) { //add or update int tag
     	return bam_aux_update_int(b, tag, val);
     }
+    int add_double_tag(const char tag[2], double val) { //add or update double tag
+    	return bam_aux_update_float(b, tag, val);
+    }
     int remove_tag(const char tag[2]);
     inline int delete_tag(const char tag[2]) { return remove_tag(tag); }
 

@@ -54,8 +54,12 @@ const char* USAGE = "TieBrush v" VERSION "\n"
                               "  -S,--keep-supp\tIf enabled, supplementary alignments will be\n"
                               "                \tincluded in the collapsed groups of reads.\n"
                               "                \tBy default, TieBrush removes any mappings\n"
-                              "                \tnot listed as primary (0x100). Note, that if enabled,\n"
-                              "                \teach supplementary mapping will count as a separate read\n"
+                              "                \tnot listed as primary (0x800).\n"
+                              "  --keep-secondary\tIf enabled, secondary alignments will be\n"
+                              "                   \tincluded in the collapsed groups of reads.\n"
+                              "                   \tBy default, TieBrush removes any mappings\n"
+                              "                   \tnot listed as primary (0x100). Note, that if enabled,\n"
+                              "                   \teach secondary mapping will count as a separate read\n"
                               "  -M,--keep-unmap\tIf enabled, unmapped reads will be retained (uncollapsed)\n"
                               "                 \tin the output. By default, TieBrush removes any\n"
                               "                 \tunmapped reads\n"
@@ -64,7 +68,9 @@ const char* USAGE = "TieBrush v" VERSION "\n"
                               "  -F\t\t\tBits in SAM flag to use in read comparison. Only reads that\n"
 							  "    \t\t\thave specified flags will be merged together (default: 0)\n"
 							  "  -A,--collapse-same\tIf enabled, will collapse same read alignment\n"
-							  "    \tduplicated just for pairing reasons (default: disabled)\n";
+							  "    \tduplicated just for pairing reasons (default: disabled)\n"
+							  "  --store-frac\t\tIf enabled, will store fractional values for YC tag\n"
+							  "    \tusing NH tag (1.0/NH) for non-TieBrush records (default: disabled)\n";
 
 // 1. add mode to select representative alignment
 // 2. add mode to select consensus sequence
@@ -85,8 +91,10 @@ struct Options{
     int min_qual = -1;
     bool keep_unmapped = true;
     bool keep_supplementary = false;
+    bool keep_secondary = false;
     uint32_t flags = 0;
     bool collapse_same = false;
+    bool store_frac = false;
 } options;
 
 TMrgStrategy mrgStrategy=tMrgStratCIGAR;
@@ -342,7 +350,7 @@ int cmpExons(GSamRecord& a, GSamRecord& b) {
 class SPData { // Same Point data
     bool settled; //real SP data, owns its r data and deallocates it on destroy
   public:
-	int64_t accYC; //if any merged records had YC tag, their values are accumulated here
+	double accYC; //if any merged records had YC tag, their values are accumulated here
 	int64_t accYX; //if any merged records had YX tag, their values are accumulated here
 	int64_t maxYD; //max bundle extent upstream in all samples (0 when no preceding overlapping reads)
 	GBitVec* samples; //which samples were the collapsed ones coming from
@@ -353,7 +361,7 @@ class SPData { // Same Point data
 	              // will be stored as tag YC:i:(dupCount+accYC)
 	GSamRecord* r;
 	char tstrand; //'-','+' or '.'
-    SPData(GSamRecord* rec=NULL):settled(false), accYC(0), accYX(0), maxYD(0),samples(NULL),
+    SPData(GSamRecord* rec=NULL):settled(false), accYC(0.0), accYX(0), maxYD(0),samples(NULL),
     		dupCount(0), r(rec), tstrand('.') {
     	if (r!=NULL) tstrand=r->spliceStrand();
     }
@@ -379,10 +387,18 @@ class SPData { // Same Point data
         }
 
     	if (trec.tbMerged) {
-    		accYC=r->tag_int("YC", 1);
+    		// For TieBrush records, YC should already be a double value
+    		accYC=r->tag_float("YC");
+    		if (accYC == 0.0) accYC = 1.0; // fallback if tag not found
     		accYX=r->tag_int("YX", 1);
     		maxYD=r->tag_int("YD", 0);
     	} else {
+    		if (options.store_frac) {
+    			int nh = r->tag_int("NH", 1);
+    			accYC = 1.0 / nh;
+    		} else {
+    			accYC = 1.0;
+    		}
     		++dupCount;
     		samples->set(trec.fidx);
             sample_dupcounts[trec.fidx]++;
@@ -394,7 +410,10 @@ class SPData { // Same Point data
     	GSamRecord& rec=*trec.brec;
     	//WARNING: rec MUST be a "duplicate" of current record r
     	if (trec.tbMerged) {
-    		accYC+=rec.tag_int("YC",1);
+    		// For TieBrush records, YC should already be a double value
+    		double yc_val = rec.tag_float("YC");
+    		if (yc_val == 0.0) yc_val = 1.0; // fallback if tag not found
+    		accYC += yc_val;
     		accYX+=rec.tag_int("YX", 1);
     		int64_t vYD=rec.tag_int("YD",0);
     		if (vYD>maxYD) maxYD=vYD; //keep only maximum YD value
@@ -403,6 +422,12 @@ class SPData { // Same Point data
     		if (!options.collapse_same || 
     		    !samples->test(trec.fidx) || rec.pairOrder()!=r->pairOrder() ||
     				strcmp(r->name(), rec.name())!=0) {
+    		   if (options.store_frac) {
+    			   int nh = rec.tag_int("NH", 1);
+    			   accYC += 1.0 / nh;
+    		   } else {
+    			   accYC += 1.0;
+    		   }
     		   dupCount++;
     		   samples->set(trec.fidx);
     		   sample_dupcounts[trec.fidx]++;
@@ -478,14 +503,10 @@ void flushPData(GList<SPData>& spdlst){ //write spdata to outfile
   // write SAM records in spdata to outfile
   for (int i=0;i<spdlst.Count();++i) {
 	  SPData& spd=*(spdlst.Get(i));
-	  int64_t accYC=spd.accYC+spd.dupCount;
-      if(spd.accYC+spd.dupCount > UINT32_MAX){ // set a cap to prevent overflow with SAM
-          accYC = UINT32_MAX;
-      }
 	  int64_t accYX=spd.accYX;
 	  int dSamples=spd.samples->count(); //this only has direct, non-TieBrush samples
 	  accYX+=dSamples;
-	  spd.r->add_int_tag("YC", (accYC == 1) ? 1 : accYC);
+	  spd.r->add_double_tag("YC", spd.accYC);
 	  spd.r->add_int_tag("YX", (accYX == 1) ? 1 : accYX);
 	  int dmax=spd.maxYD;
 	  for(int s=spd.samples->find_first();s>=0;s=spd.samples->find_next(s)) {
@@ -510,6 +531,7 @@ void flushPData(GList<SPData>& spdlst){ //write spdata to outfile
 
 bool passes_options(GSamRecord* brec){
     if(!options.keep_supplementary && brec->get_b()->core.flag & 0x100) return false;
+    if(!options.keep_secondary && brec->get_b()->core.flag & 0x200) return false;
     if(!options.keep_unmapped && brec->isUnmapped()) return false;
     if(brec->mapq()<options.min_qual) return false;
     int nh = brec->tag_int("NH");
@@ -580,7 +602,7 @@ int main(int argc, char *argv[])  {
 // <------------------ main() end -----
 
 void processOptions(int argc, char* argv[]) {
-    GArgs args(argc, argv, "help;debug;verbose;version;full;clip;exon;keep-supp;keep-unmap;collapse-same;SMLPEDVho:N:Q:F:A");
+    GArgs args(argc, argv, "help;debug;verbose;version;full;clip;exon;keep-supp;keep-secondary;keep-unmap;collapse-same;store-frac;SMLPEDVho:N:Q:F:A");
     args.printError(USAGE, true);
 
     if (args.getOpt('h') || args.getOpt("help")) {
@@ -618,8 +640,10 @@ void processOptions(int argc, char* argv[]) {
         options.flags=flag_str.asInt();
     }
     options.keep_supplementary = (args.getOpt("keep-supp")!=NULL || args.getOpt("S")!=NULL);
+    options.keep_secondary = (args.getOpt("keep-secondary")!=NULL);
     options.keep_unmapped = (args.getOpt("keep-unmap")!=NULL || args.getOpt("M")!=NULL);
     options.collapse_same = (args.getOpt("collapse-same")!=NULL || args.getOpt('A')!=NULL);
+    options.store_frac = (args.getOpt("store-frac")!=NULL);
 
     bool stratF=(args.getOpt("full")!=NULL || args.getOpt('L')!=NULL);
     bool stratP=(args.getOpt("clip")!=NULL || args.getOpt('P')!=NULL);

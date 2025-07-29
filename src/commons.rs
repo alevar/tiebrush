@@ -24,16 +24,18 @@ pub fn flags_set(record: &Record, flags: u16) -> bool {
     (record.flags() & flags) == flags
 }
 
-pub fn get_yc_tag(record: &Record) -> anyhow::Result<Option<i32>> {
+pub fn get_yc_tag(record: &Record) -> anyhow::Result<Option<f64>> {
     match record.aux(b"YC") {
         Ok(yc_val) => match yc_val {
-            Aux::I8(val) => Ok(Some(val as i32)),
-            Aux::I16(val) => Ok(Some(val as i32)),
-            Aux::I32(val) => Ok(Some(val as i32)),
-            Aux::U8(val) => Ok(Some(val as i32)),
-            Aux::U16(val) => Ok(Some(val as i32)),
-            Aux::U32(val) => Ok(Some(val as i32)),
-            _ => anyhow::bail!("Value for YC tag is not an integer."),
+            Aux::I8(val) => Ok(Some(val as f64)),
+            Aux::I16(val) => Ok(Some(val as f64)),
+            Aux::I32(val) => Ok(Some(val as f64)),
+            Aux::U8(val) => Ok(Some(val as f64)),
+            Aux::U16(val) => Ok(Some(val as f64)),
+            Aux::U32(val) => Ok(Some(val as f64)),
+            Aux::Float(val) => Ok(Some(val as f64)),
+            Aux::Double(val) => Ok(Some(val as f64)),
+            _ => anyhow::bail!("Value for YC tag can not be converted to a float."),
         },
         _ => Ok(None),
     }

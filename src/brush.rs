@@ -35,7 +35,7 @@ impl TBStats {
     }
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 #[command(group(
     ArgGroup::new("cmp_group")
         .multiple(false)
@@ -63,7 +63,7 @@ pub struct BrushArgs {
     #[arg(short='E', long="exon")]
     pub exon: bool,
     /// If enabled, supplementary alignments will be included in the collapsed groups of reads. 
-    /// By default, TieBrush removes any mappings flagged as supplementary (0x800). Note, that if enabled, each supplementary mapping will count as a separate read
+    /// By default, TieBrush removes any mappings flagged as supplementary (0x800).
     #[arg(short='S', long="keep-supp")]
     pub keep_supplementary: bool,
     /// If enabled, secondary alignments will be included in the collapsed groups of reads. 
@@ -84,6 +84,10 @@ pub struct BrushArgs {
     /// Reads with the provided bits set in the flag field are included.
     #[arg(short='f', long)]
     pub include_flags: Option<u16>,
+    /// If enabled, the YC tag will be incremented fractionally based on the NH tag.
+    /// Requires --keep-secondary to be enabled.
+    #[arg(long="store-frac", requires("keep_secondary"))]
+    pub store_frac: bool,
 }
 
 trait ReadKeyStrat {
@@ -200,17 +204,25 @@ impl ReadKey {
 struct MergedReads {
     representative: Record,
     samples: Vec<bool>,
-    acc_yc: u32,
+    acc_yc: f64,
     acc_yx: u32,
 }
 
 impl MergedReads {
-    fn new(tb_record: &TBSAMReaderRecord, num_samples: usize) -> Self {
-        let yc = get_yc_tag(tb_record.record()).expect("Failed to read YC tag").unwrap_or(1) as u32;
+    fn new(tb_record: &TBSAMReaderRecord, num_samples: usize, store_frac: bool) -> Self {
+        let yc = get_yc_tag(tb_record.record()).expect("Failed to read YC tag");
+        let is_tb_record = yc.is_some();
+        let yc = yc.unwrap_or(1.0) as f64;
+        let nh = get_nh_tag(tb_record.record()).expect("Failed to read NH tag").unwrap_or(1) as u16;
         let yx = get_yx_tag(tb_record.record()).expect("Failed to read YX tag").unwrap_or(1) as u32;
         let sample_idx = tb_record.file_idx();
         let mut samples = vec![false; num_samples];
         samples[sample_idx] = true;
+        let yc = if store_frac && !is_tb_record {
+            1.0 / nh as f64
+        } else {
+            yc
+        };
         Self {
             representative: tb_record.record().clone(),
             samples,
@@ -219,13 +231,20 @@ impl MergedReads {
         }
     }
 
-    fn add_duplicate(&mut self, tb_record: &TBSAMReaderRecord) {
-        let yc = get_yc_tag(tb_record.record()).expect("Failed to read YC tag").unwrap_or(1) as u32;
+    fn add_duplicate(&mut self, tb_record: &TBSAMReaderRecord, store_frac: bool) {
+        let yc = get_yc_tag(tb_record.record()).expect("Failed to read YC tag");
+        let is_tb_record = yc.is_some();
+        let yc = yc.unwrap_or(1.0) as f64;
+        let nh = get_nh_tag(tb_record.record()).expect("Failed to read NH tag").unwrap_or(1) as u16;
         let yx = get_yx_tag(tb_record.record()).expect("Failed to read YX tag").unwrap_or(1) as u32;
         let sample_idx = tb_record.file_idx();
 
         self.samples[sample_idx] = true;
-        self.acc_yc += yc;
+        self.acc_yc += if store_frac && !is_tb_record {
+            1.0 / nh as f64
+        } else {
+            yc
+        };
         self.acc_yx += yx;
     }
 }
@@ -345,9 +364,9 @@ impl BrushCMD {
         
         let read_key = ReadKey::create_key(&record,self.cmp_strat)?;
         if let Some(grouped_reads) = self.current_reads.get_mut(&read_key) {
-            grouped_reads.add_duplicate(&record);
+            grouped_reads.add_duplicate(&record, self.brush_args.store_frac);
         } else {
-            self.current_reads.insert(read_key, MergedReads::new(&record, self.brush_args.input_alignments.len()));
+            self.current_reads.insert(read_key, MergedReads::new(&record, self.brush_args.input_alignments.len(), self.brush_args.store_frac));
         }
         
         Ok(())
@@ -355,7 +374,7 @@ impl BrushCMD {
 
     fn flush_current_reads(&mut self) -> anyhow::Result<()> {
         for (_, mut grouped_reads) in self.current_reads.drain() {
-            grouped_reads.representative.push_aux(b"YC", rust_htslib::bam::record::Aux::I32(grouped_reads.acc_yc as i32))?;
+            grouped_reads.representative.push_aux(b"YC", rust_htslib::bam::record::Aux::Double(grouped_reads.acc_yc as f64))?;
             grouped_reads.representative.push_aux(b"YX",rust_htslib::bam::record::Aux::I32(grouped_reads.samples.iter().filter(|&&s| s).count() as i32))?;
             
             self.tb_writer.as_mut().unwrap().write(&grouped_reads.representative)?;
@@ -465,18 +484,18 @@ mod tests {
 
         let num_samples = 2;
 
-        let mut merged_reads = MergedReads::new(&tb_rec1, num_samples);
+        let mut merged_reads = MergedReads::new(&tb_rec1, num_samples, false);
         assert_eq!(merged_reads.samples.len(), num_samples);
         assert!(merged_reads.samples[0]);
         assert!(!merged_reads.samples[1]);
-        assert_eq!(merged_reads.acc_yc, 1);
+        assert_eq!(merged_reads.acc_yc, 1.0);
         assert_eq!(merged_reads.acc_yx, 1);
         
-        merged_reads.add_duplicate(&tb_rec2);
+        merged_reads.add_duplicate(&tb_rec2, false);
         assert_eq!(merged_reads.samples.len(), num_samples);
         assert!(merged_reads.samples[0]);
         assert!(merged_reads.samples[1]);
-        assert_eq!(merged_reads.acc_yc, 2);
+        assert_eq!(merged_reads.acc_yc, 2.0);
         assert_eq!(merged_reads.acc_yx, 2);
     }
 
@@ -484,7 +503,7 @@ mod tests {
     fn test_merged_reads_with_existing_tags() {
         let record1 = create_test_record(b"r1", 0, 100, vec![Cigar::Match(50)], true);
         let mut record2 = create_test_record(b"r2", 0, 100, vec![Cigar::Match(50)], true);
-        record2.push_aux(b"YC", rust_htslib::bam::record::Aux::I32(4)).unwrap();
+        record2.push_aux(b"YC", rust_htslib::bam::record::Aux::Double(4.0)).unwrap();
         record2.push_aux(b"YX", rust_htslib::bam::record::Aux::I32(2)).unwrap();
 
         let tb_rec1 = TBSAMReaderRecord::new(record1, 0);
@@ -492,18 +511,18 @@ mod tests {
 
         let num_samples = 2;
 
-        let mut merged_reads = MergedReads::new(&tb_rec1, num_samples);
+        let mut merged_reads = MergedReads::new(&tb_rec1, num_samples, false);
         assert_eq!(merged_reads.samples.len(), num_samples);
         assert!(merged_reads.samples[0]);
         assert!(!merged_reads.samples[1]);
-        assert_eq!(merged_reads.acc_yc, 1);
+        assert_eq!(merged_reads.acc_yc, 1.0);
         assert_eq!(merged_reads.acc_yx, 1);
 
-        merged_reads.add_duplicate(&tb_rec2);
+        merged_reads.add_duplicate(&tb_rec2, false);
         assert_eq!(merged_reads.samples.len(), num_samples);
         assert!(merged_reads.samples[0]);
         assert!(merged_reads.samples[1]);
-        assert_eq!(merged_reads.acc_yc, 5);
+        assert_eq!(merged_reads.acc_yc, 5.0);
         assert_eq!(merged_reads.acc_yx, 3);
     }
 }

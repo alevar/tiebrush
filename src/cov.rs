@@ -50,7 +50,7 @@ pub struct CovArgs {
 /// otherwise errors will be thrown.
 #[derive(Debug)]
 pub struct JuncMat {
-    data: HashMap<(Strand,i64, i64), u64>,
+    data: HashMap<(Strand,i64, i64), f64>,
 }
 
 impl JuncMat {
@@ -58,15 +58,15 @@ impl JuncMat {
         Self {data: HashMap::new() }
     }
 
-    pub fn insert(&mut self, strand: Strand, start: i64, end: i64, val: u64) {
+    pub fn insert(&mut self, strand: Strand, start: i64, end: i64, val: f64) {
         self.data.insert((strand, start, end), val);
     }
 
-    pub fn get(&self, strand: Strand, start: i64, end: i64) -> Option<&u64> {
+    pub fn get(&self, strand: Strand, start: i64, end: i64) -> Option<&f64> {
         self.data.get(&(strand, start, end))
     }
 
-    pub fn get_mut(&mut self, strand: Strand, start: i64, end: i64) -> Option<&mut u64> {
+    pub fn get_mut(&mut self, strand: Strand, start: i64, end: i64) -> Option<&mut f64> {
         self.data.get_mut(&(strand, start, end))
     }
 
@@ -75,7 +75,7 @@ impl JuncMat {
     }
 
     /// Increment the value for a given junction, or insert with the provided value if not present (for counts).
-    pub fn increment(&mut self, strand: Strand, start: i64, end: i64, val: u64)
+    pub fn increment(&mut self, strand: Strand, start: i64, end: i64, val: f64)
     {
         match self.data.entry((strand, start, end)) {
             Entry::Occupied(mut e) => *e.get_mut() += val,
@@ -97,15 +97,15 @@ pub struct TBCov {
     seqid: i32,
     start: i64,
     end: i64,
-    cov: Vec<i32>,
+    cov: Vec<f64>,
     junc: JuncMat,
 }
 
 impl TBCov {
-    pub fn new(seqid: i32, start: i64, end: i64, val: i32) -> Self {
+    pub fn new(seqid: i32, start: i64, end: i64, val: f64) -> Self {
         Self {  seqid,
                 start, end,
-                cov: vec![val as i32; (end - start) as usize],
+                cov: vec![val as f64; (end - start) as usize],
                 junc: JuncMat::default(),
         }
     }
@@ -113,7 +113,7 @@ impl TBCov {
     pub fn new_from_record(record: &Record, store_cov: bool, store_junc: bool) -> Self {
         let start = record.pos();
         let end = record.reference_end();
-        let mut tbcov = Self::new(record.tid(), start, end, 0);
+        let mut tbcov = Self::new(record.tid(), start, end, 0.0);
         tbcov.add_record(record, store_cov, store_junc);
         tbcov
     }
@@ -141,13 +141,13 @@ impl TBCov {
         // get YC tag if available as coverage otherwise use 1
         let yc = match get_yc_tag(&record)? {
             Some(yc) => yc,
-            None => 1,
+            None => 1.0,
         };
 
         if record.reference_end() > self.end && store_cov {
             // extend the cov vec
             let extend_len = (record.reference_end() - self.end) as usize;
-            self.cov.extend(vec![0; extend_len]);
+            self.cov.extend(vec![0.0; extend_len]);
             self.end = record.reference_end();
         }
 
@@ -191,7 +191,7 @@ impl TBCov {
 
 impl Default for TBCov {
     fn default() -> Self {
-        Self::new(0, 0, 0, 0)
+        Self::new(0, 0, 0, 0.0)
     }
 }
 
@@ -357,7 +357,7 @@ impl CovCMD {
         let mut last_pos = tbcov.start;
         let mut pos_cov = tbcov.cov[0];
         for (i, val) in tbcov.cov.iter().enumerate() {
-            if *val == 0 {
+            if *val == 0.0 {
                 continue;
             }
             let pos = tbcov.start + i as i64;

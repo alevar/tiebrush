@@ -3,6 +3,9 @@ name = "tiebrush"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+test = []
+
 [dependencies]
 rust-htslib = "0.50.0"
 clap = "4.5.41"

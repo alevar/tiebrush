@@ -2,15 +2,48 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Rust tiebrush cov t1",
+            "name": "Debug Rust tiebrush cov t1s0",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/tiebrush",
-            "args": ["cov", "--coverage", "example/t1/t1.coverage.bedgraph", "--junctions", "example/t1/t1.junctions.bed", "example/t1/t1s0.bam", "example/t1/t1s1.bam"],
+            "args": ["cov", "--coverage", "example/t1/t1s0.coverage.bedgraph", "--junctions", "example/t1/t1s0.junctions.bed", "example/t1/t1s0.bam"],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,
             "sourceLanguages": ["rust"],
             "preLaunchTask": "cargo build"
-        }
+        },
+        {
+            "name": "Debug Rust tiebrush cov BW t1s0",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/tiebrush",
+            "args": ["cov", "--coverage", "example/t1/t1s0.coverage.bedgraph", "--bigwig", "example/t1/t1s0.bam"],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "sourceLanguages": ["rust"],
+            "preLaunchTask": "cargo build"
+        },
+        {
+            "name": "Debug Rust tiebrush brush t1s0 t1s1",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/tiebrush",
+            "args": ["brush", "--store-frac", "--keep-secondary", "--output", "example/t1/t1s01.sam", "example/t1/t1s0.bam", "example/t1/t1s1.bam"],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "sourceLanguages": ["rust"],
+            "preLaunchTask": "cargo build"
+        },
+        {
+            "name": "Debug Rust tiebrush cov t1s01.tb",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/tiebrush",
+            "args": ["cov", "--coverage", "example/t1/t1s01.tb.coverage.bedgraph", "--junctions", "example/t1/t1s01.tb.junctions.bed", "example/t1/t1s01.sam"],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "sourceLanguages": ["rust"],
+            "preLaunchTask": "cargo build"
+        },
     ]
 }

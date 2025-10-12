@@ -102,27 +102,30 @@ endif()
 # External projects
 include(ExternalProject)
 
-# htslib external project
+# htslib external project (use release tarball to avoid Git clone issues on some CMake versions)
 ExternalProject_Add(htslib
-    GIT_REPOSITORY "https://github.com/samtools/htslib.git"
-    GIT_TAG "1.18"
-    SOURCE_DIR ${CMAKE_SOURCE_DIR}/include/htslib/
+    URL "https://github.com/samtools/htslib/releases/download/1.18/htslib-1.18.tar.bz2"
+    DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/tmp"
+    SOURCE_DIR ${CMAKE_SOURCE_DIR}/include/htslib
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND autoreconf -i COMMAND ./configure --without-libdeflate --disable-libcurl
-    BUILD_COMMAND ${MAKE}
+    # Build only the static library to avoid building tests/tools
+    BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} libhts.a
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/include/htslib/libhts.a
 )
 
-# libBigWig external project
+# libBigWig external project (use release tarball to avoid Git clone issues)
 ExternalProject_Add(libBigWig
-    GIT_REPOSITORY "https://github.com/alevar/libBigWig"
-    UPDATE_COMMAND ""
-    DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/include/"
+    URL "https://github.com/dpryan79/libBigWig/archive/refs/tags/0.4.8.tar.gz"
+    DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}/tmp"
     SOURCE_DIR "${CMAKE_SOURCE_DIR}/include/libBigWig"
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND "${LIBBIGWIG_MAKE_CMD}"
+    # Apply local minZoom patch after extraction, before build
+    PATCH_COMMAND patch -p0 -N -i ${CMAKE_SOURCE_DIR}/cmake/patches/libBigWig-minzoom.patch
+    # Clean and build static lib, forcing HAVE_CURL=NO so Makefile adds -DNOCURL
+    BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} clean && ${CMAKE_MAKE_PROGRAM} HAVE_CURL=NO libBigWig.a
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/include/libBigWig/libBigWig.a
 )

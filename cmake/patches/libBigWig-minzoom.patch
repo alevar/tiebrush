@@ -1,0 +1,126 @@
+--- bigWig.h
++++ bigWig.h
+@@ -14,7 +14,7 @@
+  *
+  * \section Introduction
+  *
+- * libBigWig is a C library for parsing local/remote bigWig and bigBed files. This is similar to Kent's library from UCSC, except 
++ * libBigWig is a C library for parsing local/remote bigWig and bigBed files. This is similar to Kent's library from UCSC, except
+  *  * The license is much more liberal
+  *  * This code doesn't call `exit()` on error, thereby killing the calling application.
+  *
+@@ -41,10 +41,10 @@
+  * As of version 0.3.0, libBigWig supports iterating over intervals in bigWig files and entries in bigBed files. The number of intervals/entries returned with each iteration can be controlled by setting the number of blocks processed in each iteration (intervals and entries are group inside of bigWig and bigBed files into blocks of entries). See `test/testIterator.c` for an example.
+  *
+  * \section Examples
+- * 
++ *
+  * Please see [README.md](README.md) and the files under `test/` for examples.
+  */
+- 
++
+ 
+ /*! \file bigWig.h
+  *
+@@ -109,7 +109,7 @@
+     max = 2, /*!< The maximum value */
+     min = 3, /*!< The minimum value */
+     cov = 4, /*!< The number of bases covered */
+-    coverage = 4, /*!<The number of bases covered */ 
++    coverage = 4, /*!<The number of bases covered */
+     sum = 5 /*!< The sum of per-base values */
+ };
+ 
+@@ -257,6 +257,15 @@
+     void *data; /**<Points to either intervals or entries. If there are no further intervals/entries, then this is NULL. Use this to test for whether to continue iterating.*/
+ } bwOverlapIterator_t;
+ 
++
++/*
++ * @brief Override the minimum (first) zoom level size.
++ * If set to >0, the first zoom level (tile size) will be exactly this value,
++ * subject to clamping to the largest chromosome length. Subsequent levels are x4.
++ * Optional; not required for normal usage.
++ */
++void bwSetMinZoom(uint32_t minZoom);
++
+ /*!
+  * @brief Initializes curl and global variables. This *MUST* be called before other functions (at least if you want to connect to remote files).
+  * For remote file, curl must be initialized and regions of a file read into an internal buffer. If the buffer is too small then an excessive number of connections will be made. If the buffer is too large than more data than required is fetched. 128KiB is likely sufficient for most needs.
+@@ -396,7 +405,7 @@
+  * @see bwOverlapIterator_t
+  * @see bwIteratorNext
+  * @see bwIteratorDestroy
+- */ 
++ */
+ bwOverlapIterator_t *bwOverlappingIntervalsIterator(bigWigFile_t *fp, const char *chrom, uint32_t start, uint32_t end, uint32_t blocksPerIteration);
+ 
+ /*!
+@@ -414,7 +423,7 @@
+  * @see bwOverlapIterator_t
+  * @see bwIteratorNext
+  * @see bwIteratorDestroy
+- */ 
++ */
+ bwOverlapIterator_t *bbOverlappingEntriesIterator(bigWigFile_t *fp, const char *chrom, uint32_t start, uint32_t end, int withString, uint32_t blocksPerIteration);
+ 
+ /*!
+@@ -423,7 +432,7 @@
+  * @return NULL on error, otherwise a bwOverlapIterator_t pointer with the intervals or entries from the next set of blocks.
+  * @see bwOverlapIterator_t
+  * @see bwIteratorDestroy
+- */ 
++ */
+ bwOverlapIterator_t *bwIteratorNext(bwOverlapIterator_t *iter);
+ 
+ /*!
+@@ -510,7 +519,7 @@
+  * Adds entries of the form:
+  * chromosome	start	end	value
+  * to the file. These will always be added in a new block, so you may have previously used a different storage type.
+- * 
++ *
+  * In general it's more efficient to use the bwAppend* functions, but then you MUST know that the previously written block is of the same type. In other words, you can only use bwAppendIntervals() after bwAddIntervals() or a previous bwAppendIntervals().
+  * @param fp The output file pointer.
+  * @param chrom A list of chromosomes, of length `n`.
+--- bwWrite.c
++++ bwWrite.c
+@@ -6,6 +6,13 @@
+ #include "bigWig.h"
+ #include "bwCommon.h"
+ 
++// Add a global minZoom override (0 = disabled)
++static uint32_t g_bwMinZoom = 0;
++
++void bwSetMinZoom(uint32_t minZoom) {
++    g_bwMinZoom = minZoom;
++}
++
+ /// @cond SKIP
+ struct val_t {
+     uint32_t tid;
+@@ -809,13 +816,17 @@
+     uint32_t meanBinSize, i;
+     uint32_t multiplier = 4, zoom = 10, maxZoom = 0;
+     uint16_t nLevels = 0;
+-
+-    meanBinSize = ((double) fp->writeBuffer->runningWidthSum)/(fp->writeBuffer->nEntries);
+-    //In reality, one level is skipped
+-    meanBinSize *= 4;
+-    //N.B., we must ALWAYS check that the zoom doesn't overflow a uint32_t!
+-    if(((uint32_t)-1)>>2 < meanBinSize) return 0; //No zoom levels!
+-    if(meanBinSize*4 > zoom) zoom = multiplier*meanBinSize;
++    if(g_bwMinZoom > 0) { //user override of minimum zoom level (e.g. 32)
++        // Use the override directly as the first zoom level; clamp later to maxZoom
++        zoom = g_bwMinZoom;
++    } else {
++      meanBinSize = ((double) fp->writeBuffer->runningWidthSum)/(fp->writeBuffer->nEntries);
++      //In reality, one level is skipped
++      meanBinSize *= 4;
++      //N.B., we must ALWAYS check that the zoom doesn't overflow a uint32_t!
++      if(((uint32_t)-1)>>2 < meanBinSize) return 0; //No zoom levels!
++      if(meanBinSize*4 > zoom) zoom = multiplier*meanBinSize;
++    }
+ 
+     fp->hdr->zoomHdrs = calloc(1, sizeof(bwZoomHdr_t));
+     if(!fp->hdr->zoomHdrs) return 1;

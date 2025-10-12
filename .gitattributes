@@ -1,0 +1,3 @@
+# exclude these from the automated source code archive github creates
+/.github/ export-ignore
+/.gitattributes export-ignore
